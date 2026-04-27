@@ -6,3 +6,7 @@ dist
 .env.development
 .DS_Store
 *.log
+
+# TS / Vite cache
+*.tsbuildinfo
+vite.config.ts.timestamp-*
