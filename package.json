@@ -1,0 +1,35 @@
+{
+  "name": "bot-hh-habr",
+  "version": "1.0.0",
+  "description": "Бот сбора и фильтрации откликов с Хабр Карьеры и HH.ru",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test tests/**/*.test.js",
+    "test:unit": "node --test tests/unit/**/*.test.js",
+    "test:watch": "node --test --watch tests/**/*.test.js",
+    "test:habr-source": "node src/sources/habr.js",
+    "test:hh-source": "node src/sources/hh.js",
+    "ai:analyze": "node scripts/analyze-existing.js",
+    "ranking:rebuild": "node scripts/rebuild-ranking.js",
+    "ranking:top": "node scripts/top-candidates.js",
+    "db:schema": "echo 'Применить db/schema.sql через Supabase Dashboard или psql'"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.43.0",
+    "axios": "^1.7.2",
+    "cheerio": "^1.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1",
+    "googleapis": "^140.0.0",
+    "node-cron": "^3.0.3",
+    "pdf-parse": "^2.4.5",
+    "winston": "^3.13.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

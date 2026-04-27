@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head><title>Отклики на вакансии — Хабр Карьера</title></head>
+<body>
+  <!--
+    РЕАЛЬНАЯ структура страницы откликов (подтверждена через скриншот кабинета).
+    Каждая карточка содержит: имя, должность, опыт в годах, город, навыки, контакты.
+    Гражданство НЕ отображается на списке — только город.
+    external_id предположительно в data-атрибуте или в href ссылки на профиль.
+  -->
+
+  <div class="responses-list">
+
+    <!-- Карточка 1: Senior с опытом > 5 лет -->
+    <div class="response-item" data-id="resp-001">
+      <div class="response-item__header">
+        <a href="/xxx2coder?source=response&amp;source_id=4509100" class="response-item__name">
+          Виталий Шерстобитов
+        </a>
+        <span class="response-item__date">26 апреля 2026 в 23:07</span>
+      </div>
+      <div class="response-item__position">Бэкенд разработчик • Senior</div>
+      <div class="response-item__salary">От 250 000 ₽ • Ищу работу</div>
+
+      <div class="response-item__section">
+        <div class="response-item__label">Опыт работы</div>
+        <div class="response-item__value">4 компании • 6 лет и 3 месяца</div>
+      </div>
+
+      <div class="response-item__section">
+        <div class="response-item__label">Город</div>
+        <div class="response-item__value">Санкт-Петербург • Готов к удалённой работе</div>
+      </div>
+
+      <div class="response-item__actions">
+        <button>Пригласить</button>
+        <button>Отказать</button>
+      </div>
+    </div>
+
+    <!-- Карточка 2: Middle с опытом < 5 лет -->
+    <div class="response-item" data-id="resp-002">
+      <div class="response-item__header">
+        <a href="/ramazon?source=response&amp;source_id=4509015" class="response-item__name">
+          Рамазон Махмудов
+        </a>
+        <span class="response-item__date">26 апреля 2026 в 23:52</span>
+      </div>
+      <div class="response-item__position">Бэкенд разработчик • Middle</div>
+      <div class="response-item__salary">От 130 000 ₽ • Ищу работу</div>
+
+      <div class="response-item__section">
+        <div class="response-item__label">Опыт работы</div>
+        <div class="response-item__value">3 компании • 3 года и 6 месяцев</div>
+      </div>
+
+      <div class="response-item__section">
+        <div class="response-item__label">Город</div>
+        <div class="response-item__value">Москва • Готов к удалённой работе</div>
+      </div>
+    </div>
+
+    <!-- Карточка 3: Junior 17 лет -->
+    <div class="response-item" data-id="resp-003">
+      <div class="response-item__header">
+        <a href="/daniil-babaev?source=response&amp;source_id=4509200" class="response-item__name">
+          Данил Бабаев
+        </a>
+        <span class="response-item__date">26 апреля 2026 в 21:40</span>
+      </div>
+      <div class="response-item__position">Фулстек разработчик • Junior</div>
+      <div class="response-item__salary">От 70 000 ₽ • Ищу работу</div>
+
+      <div class="response-item__section">
+        <div class="response-item__label">Опыт работы</div>
+        <div class="response-item__value">1 компания • 2 года и 4 месяца</div>
+      </div>
+
+      <div class="response-item__section">
+        <div class="response-item__label">Город</div>
+        <div class="response-item__value">Краснодар • Готов к удалённой работе</div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

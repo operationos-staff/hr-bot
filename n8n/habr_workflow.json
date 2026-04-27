@@ -1,0 +1,282 @@
+{
+  "name": "Habr Career — Отклики на вакансии",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger (каждые 5 мин)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://career.habr.com/companies/{{ $env.HABR_COMPANY_SLUG }}/responses",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Cookie",
+              "value": "={{ $env.HABR_COOKIE }}"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          }
+        }
+      },
+      "id": "http-habr-responses",
+      "name": "GET Habr — Список откликов",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Парсим HTML список откликов с Хабра\n// ВАЖНО: обновить селекторы после анализа реального HTML\n\nconst html = $input.first().json.data;\n\n// Используем простой regex для быстрого парсинга\n// В продакшне лучше использовать cheerio через Code node с npm\nconst responses = [];\n\n// Ищем ссылки на профили кандидатов\nconst linkRegex = /href=\"(\\/resumes\\/[^\"]+|https:\\/\\/career\\.habr\\.com\\/[^\"]+\\/resumes\\/[^\"]+)\"/g;\nconst nameRegex = /<a[^>]*class=\"[^\"]*name[^\"]*\"[^>]*>([^<]+)<\\/a>/g;\n\nlet match;\nconst seen = new Set();\n\n// TODO: заменить на реальные селекторы после проверки HTML\n// Этот блок — заглушка, требует адаптации\nconst itemRegex = /data-response-id=\"([^\"]+)\"/g;\nwhile ((match = itemRegex.exec(html)) !== null) {\n  const id = match[1];\n  if (!seen.has(id)) {\n    seen.add(id);\n    responses.push({\n      external_id: id,\n      source: 'habr',\n      raw_html_fragment: '' // будет заполнено при реальном парсинге\n    });\n  }\n}\n\nreturn responses.map(r => ({ json: r }));"
+      },
+      "id": "code-parse-list",
+      "name": "Parse — список откликов",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT external_id FROM applications WHERE source = 'habr' AND external_id = $1",
+        "additionalFields": {
+          "queryParams": "={{ [$json.external_id] }}"
+        }
+      },
+      "id": "supabase-dedup-check",
+      "name": "Supabase — проверка дедупа",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [900, 300],
+      "credentials": {
+        "postgres": {
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "new-check",
+              "leftValue": "={{ $json.result.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "filter-new-only",
+      "name": "Только новые?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://career.habr.com{{ $json.candidate_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Cookie",
+              "value": "={{ $env.HABR_COOKIE }}"
+            }
+          ]
+        }
+      },
+      "id": "http-fetch-resume",
+      "name": "GET Habr — Резюме кандидата",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Парсим резюме: гражданство, опыт, локация, должность\nconst html = $input.first().json.data;\n\nfunction extractText(html, regex) {\n  const m = html.match(regex);\n  return m ? m[1].trim() : null;\n}\n\nconst citizenship = extractText(html, /Гражданство[^:]*:[\\s]*([А-Яа-яA-Za-z\\s]+)/i);\n\nconst expStr = extractText(html, /Опыт[\\s]+работы[^:]*:[\\s]*([\\d\\s]+(?:лет|год|года|месяц[а-в]*)?)/i);\n\nconst location = extractText(html, /<span[^>]*class=\"[^\"]*location[^\"]*\"[^>]*>([^<]+)<\\/span>/i);\n\nconst position = extractText(html, /<h1[^>]*class=\"[^\"]*title[^\"]*\"[^>]*>([^<]+)<\\/h1>/i);\n\n// Нормализация гражданства\nfunction normalizeCitizenship(raw) {\n  if (!raw) return null;\n  const s = raw.toLowerCase().trim();\n  if (s.includes('россия') || s.includes('russia')) return 'RU';\n  return 'OTHER';\n}\n\n// Нормализация опыта (в годах)\nfunction parseExp(raw) {\n  if (!raw) return null;\n  let months = 0;\n  const y = raw.match(/(\\d+)\\s*(лет|год|года)/);\n  const m = raw.match(/(\\d+)\\s*(месяц|месяца|месяцев)/);\n  if (y) months += parseInt(y[1]) * 12;\n  if (m) months += parseInt(m[1]);\n  return months > 0 ? Math.round(months / 12 * 10) / 10 : null;\n}\n\nconst citizenshipNorm = normalizeCitizenship(citizenship);\nconst experienceYears = parseExp(expStr);\n\n// Фильтрация\nlet qualified = null;\nlet filter_reason = null;\n\nif (citizenshipNorm === 'OTHER') {\n  qualified = false;\n  filter_reason = 'Гражданство: ' + citizenship;\n} else if (experienceYears !== null && experienceYears < 5) {\n  qualified = false;\n  filter_reason = 'Опыт менее 5 лет: ' + experienceYears;\n} else {\n  const issues = [];\n  if (citizenshipNorm === null) issues.push('гражданство не указано');\n  if (experienceYears === null) issues.push('опыт не указан');\n  if (issues.length > 0) {\n    qualified = null; // 🟡\n    filter_reason = 'Нет данных: ' + issues.join(', ');\n  } else {\n    qualified = true; // ✅\n  }\n}\n\nreturn [{\n  json: {\n    ...$input.first().json,\n    citizenship: citizenshipNorm,\n    citizenship_raw: citizenship,\n    experience_years: experienceYears,\n    experience_raw: expStr,\n    location,\n    position,\n    qualified,\n    filter_reason,\n  }\n}];"
+      },
+      "id": "code-parse-resume",
+      "name": "Parse резюме + фильтрация",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "id": "not-filtered",
+              "leftValue": "={{ $json.qualified }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "filter-qualified",
+      "name": "Подходит или 🟡?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [1780, 200]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHANNEL_ID }}",
+        "text": "={{ ($json.qualified === true ? '✅' : '🟡') + ' ' + ($json.qualified === true ? 'Новый отклик' : 'Отклик (нет данных: ' + $json.filter_reason + ')') + ' — Хабр Карьера\\n\\n' + '👤 ' + ($json.candidate_name || 'Имя не указано') + '\\n' + '💼 ' + ($json.position || '—') + '\\n' + '🏢 Вакансия: ' + ($json.vacancy_title || '—') + '\\n' + '📍 ' + ($json.location || '—') + ' | ' + ($json.citizenship === 'RU' ? '🇷🇺 Россия' : '🌍 не указано') + '\\n' + '⏱ Опыт: ' + ($json.experience_years !== null ? $json.experience_years + ' лет' : 'не указан') }}",
+        "additionalFields": {
+          "parse_mode": "Markdown",
+          "reply_markup": "={{ JSON.stringify({ inline_keyboard: [[{ text: 'Открыть на Хабре →', url: 'https://career.habr.com' + $json.candidate_url }]] }) }}"
+        }
+      },
+      "id": "telegram-send",
+      "name": "Telegram — отправка карточки",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2000, 200],
+      "credentials": {
+        "telegramApi": {
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEETS_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Подходящие",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Дата получения": "={{ new Date().toLocaleString('ru-RU', {timeZone: 'Europe/Moscow'}) }}",
+            "Статус": "={{ $json.qualified === true ? '✅ Подходит' : '🟡 Проверить' }}",
+            "Источник": "=Хабр Карьера",
+            "Имя кандидата": "={{ $json.candidate_name || '' }}",
+            "Должность": "={{ $json.position || '' }}",
+            "Вакансия": "={{ $json.vacancy_title || '' }}",
+            "Локация": "={{ $json.location || '' }}",
+            "Гражданство": "={{ $json.citizenship === 'RU' ? 'Россия' : ($json.citizenship_raw || '') }}",
+            "Опыт (лет)": "={{ $json.experience_years !== null ? String($json.experience_years) : '' }}",
+            "Причина пометки": "={{ $json.filter_reason || '' }}",
+            "Ссылка": "={{ 'https://career.habr.com' + ($json.candidate_url || '') }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-append",
+      "name": "Google Sheets — добавить строку",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [2000, 380],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO applications (source, external_id, candidate_name, candidate_url, vacancy_title, position, location, citizenship, citizenship_raw, experience_years, qualified, filter_reason, received_at) VALUES ('habr', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now()) ON CONFLICT (source, external_id) DO NOTHING",
+        "additionalFields": {
+          "queryParams": "={{ [$json.external_id, $json.candidate_name, $json.candidate_url, $json.vacancy_title, $json.position, $json.location, $json.citizenship, $json.citizenship_raw, $json.experience_years, $json.qualified, $json.filter_reason] }}"
+        }
+      },
+      "id": "supabase-insert",
+      "name": "Supabase — сохранить отклик",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1780, 460],
+      "credentials": {
+        "postgres": {
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (каждые 5 мин)": {
+      "main": [[{ "node": "GET Habr — Список откликов", "type": "main", "index": 0 }]]
+    },
+    "GET Habr — Список откликов": {
+      "main": [[{ "node": "Parse — список откликов", "type": "main", "index": 0 }]]
+    },
+    "Parse — список откликов": {
+      "main": [[{ "node": "Supabase — проверка дедупа", "type": "main", "index": 0 }]]
+    },
+    "Supabase — проверка дедупа": {
+      "main": [[{ "node": "Только новые?", "type": "main", "index": 0 }]]
+    },
+    "Только новые?": {
+      "main": [[{ "node": "GET Habr — Резюме кандидата", "type": "main", "index": 0 }]]
+    },
+    "GET Habr — Резюме кандидата": {
+      "main": [[{ "node": "Parse резюме + фильтрация", "type": "main", "index": 0 }]]
+    },
+    "Parse резюме + фильтрация": {
+      "main": [[
+        { "node": "Supabase — сохранить отклик", "type": "main", "index": 0 },
+        { "node": "Подходит или 🟡?", "type": "main", "index": 0 }
+      ]]
+    },
+    "Подходит или 🟡?": {
+      "main": [[
+        { "node": "Telegram — отправка карточки", "type": "main", "index": 0 },
+        { "node": "Google Sheets — добавить строку", "type": "main", "index": 0 }
+      ]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["habr", "hh", "recruitment"],
+  "triggerCount": 1,
+  "updatedAt": "2026-04-25T00:00:00.000Z",
+  "versionId": "1"
+}

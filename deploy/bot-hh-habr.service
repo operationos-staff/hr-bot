@@ -1,0 +1,29 @@
+[Unit]
+Description=Bot HH Habr — сборщик откликов на вакансии
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/Bot_HH_Habr
+
+# Загрузка переменных окружения из .env
+EnvironmentFile=/home/ubuntu/Bot_HH_Habr/.env
+
+# Запуск
+ExecStart=/usr/bin/node src/index.js
+
+# Перезапуск при падении
+Restart=always
+RestartSec=10s
+StartLimitInterval=60s
+StartLimitBurst=3
+
+# Логирование через journald
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bot-hh-habr
+
+[Install]
+WantedBy=multi-user.target

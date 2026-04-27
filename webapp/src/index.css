@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Defaults — переопределятся из Telegram themeParams */
+  --tg-bg:        #0f1115;
+  --tg-surface:   #181b22;
+  --tg-surface-2: #20242d;
+  --tg-text:      #f5f7fb;
+  --tg-hint:      #8a8f9a;
+  --tg-link:      #4ea2ff;
+  --tg-accent:    #4ea2ff;
+  --tg-danger:    #ff5b5b;
+  --tg-success:   #34c759;
+  --tg-warning:   #ffb020;
+  --tg-border:    rgba(255, 255, 255, 0.08);
+
+  --safe-top:    env(safe-area-inset-top);
+  --safe-bot:    env(safe-area-inset-bottom);
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--tg-bg);
+  color: var(--tg-text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior-y: contain;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+/* Тонкий скроллбар */
+::-webkit-scrollbar { width: 0; height: 0; }
+
+/* Премиальный градиент-аура для подложки топ-1 */
+.aura-gold {
+  background: radial-gradient(120% 100% at 0% 0%, rgba(255, 215, 0, 0.18), transparent 60%),
+              radial-gradient(120% 100% at 100% 100%, rgba(255, 145, 0, 0.16), transparent 60%);
+}
+.aura-silver {
+  background: radial-gradient(120% 100% at 0% 0%, rgba(220, 230, 240, 0.14), transparent 60%);
+}
+.aura-bronze {
+  background: radial-gradient(120% 100% at 0% 0%, rgba(205, 127, 50, 0.18), transparent 60%);
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--tg-surface-2);
+}
+.skeleton::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+  transform: translateX(-100%);
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
+/* Стеклянная карточка */
+.glass {
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+  border: 1px solid var(--tg-border);
+  backdrop-filter: blur(8px);
+}
+
+/* Hide scrollbar but allow scroll */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
