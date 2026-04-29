@@ -25,11 +25,47 @@
 - [x] B3. Рефакторинг `src/sources/hh.js`: импортирует нормализатор, добавлены `isHHEnabled()` и DI; поддержка `HH_VACANCY_IDS` (список вакансий); все ветки покрыты юнит-тестами
 - [x] B4. Smoke-тест: `node --test tests/unit/*.test.js` — 183/183 зелёное
 
-### Блок C — после получения HH OAuth credentials от пользователя
-- [ ] C1. Прокинуть HH_CLIENT_ID, HH_CLIENT_SECRET, HH_REFRESH_TOKEN, HH_EMPLOYER_ID, HH_VACANCY_IDS (для вакансии amoCRM) в `.env`
-- [ ] C2. Локально запустить `node src/sources/hh.js` или smoke-poll → убедиться, что приходят реальные negotiations
-- [ ] C3. Задеплоить .env на VPS (vm7377), `pm2 restart bot-hh-habr`, проверить `pm2 logs bot-hh-habr`
-- [ ] C4. (опционально) Завести отдельный AI-промпт для вакансии amoCRM — иначе тех. спец будет оцениваться по требованиям PHP-вакансии
+### Блок C — после одобрения заявки HH (#21003 «рассматривается»)
+- [ ] C0. **Новый роут `src/api/routes/hh-oauth.js` (api.assisthelp.ru/hh/callback)** —
+       принимает `?code=`, обменивает на access/refresh через POST /token,
+       сохраняет в `oauth_tokens`. Юнит-тесты на обмен (мок axios).
+- [ ] C1. Прокинуть HH_CLIENT_ID, HH_CLIENT_SECRET, HH_EMPLOYER_ID, HH_VACANCY_IDS в `.env`
+- [ ] C2. Открыть `https://hh.ru/oauth/authorize?response_type=code&client_id=...&redirect_uri=https://api.assisthelp.ru/hh/callback`
+       → callback сохранит токены в БД, poller подхватит автоматически
+- [ ] C3. Smoke-test: `pm2 logs bot-hh-habr` → видны новые отклики из HH
+
+### Блок D — per-vacancy логика (старт 2026-04-29)
+**Развилки решены:**
+- Telegram → один канал (как сейчас), карточки с префиксом «[Вакансия: ...]»
+- Mini App → разводим по страницам (отдельная страница на каждую вакансию)
+- HH OAuth callback → новый роут на api.assisthelp.ru/hh/callback
+
+- [x] D1. **Миграция БД + БД-функции (TDD)** — выполнено 2026-04-29 ✅
+  - SQL-миграция `db/migrations/{ts}_add_vacancies.sql`:
+    - таблица `vacancies` (id UUID, source, external_id, title, description, ai_prompt, telegram_label, is_active, timestamps; UNIQUE(source, external_id))
+    - колонка `applications.vacancy_id` UUID nullable, FK → vacancies(id) ON DELETE NO ACTION
+    - сидирование текущей PHP-вакансии (HABR_VACANCY_IDS=1000164921) с описанием из `vacancy.txt`
+    - бэкфил: применить vacancy_id ко всем существующим habr-applications
+  - Юнит-тесты `database.js`: `getVacancyBySourceExternal`, `listVacancies({onlyActive})`, `setApplicationVacancy`
+- [ ] D2. **ai-scorer.js per-vacancy промпт (TDD)**
+  - `buildPrompt(vacancy, candidate)` берёт `vacancy.ai_prompt` или дефолт
+  - `analyzeCandidate(app, resumeText, vacancy)` — vacancy идёт сверху от poller
+  - Тесты на выбор промпта по разным вакансиям
+- [ ] D3. **poller проставляет vacancy_id (TDD)**
+  - habr-источник: vacancy_id из `vacancyId` (уже есть в normalizeHabrResponse)
+  - hh-источник: vacancy_id из `neg.vacancy.id`
+  - `processApplication` резолвит vacancy через `getVacancyBySourceExternal`, пишет в БД
+  - Тесты: `app.vacancy_id` корректно проставлен
+- [ ] D4. **Telegram-карточка с префиксом вакансии (TDD)**
+  - `buildMessage(app, vacancy)` начинается с `[Вакансия: {vacancy.title}]`
+  - Один канал — разделение через текст карточки
+  - Тесты на разные вакансии в одном канале
+- [ ] D5. **API + Mini App — страницы по вакансиям**
+  - `GET /api/vacancies` — список активных
+  - `GET /api/applications?vacancy_id=...` — фильтр
+  - `GET /api/ranking?vacancy_id=...` — фильтр в существующем endpoint
+  - Mini App: навигация (Tabs или Sidebar) по вакансиям, дефолтная — последняя активная
+  - Тесты на API; фронт визуально
 
 
 

@@ -161,6 +161,90 @@ export async function saveApplication(application) {
   logger.info(`Saved application: ${application.source}/${application.external_id} qualified=${application.qualified}`);
 }
 
+// ============================================================
+// Vacancies (D1) — модель «вакансия как first-class объект»
+// ============================================================
+
+/**
+ * Получить вакансию по паре (source, external_id).
+ * Возвращает строку из БД или null если не найдена / при ошибке.
+ */
+export async function getVacancyBySourceExternal(source, externalId) {
+  const { data, error } = await supabase
+    .from('vacancies')
+    .select('*')
+    .eq('source', source)
+    .eq('external_id', String(externalId))
+    .maybeSingle();
+
+  if (error) {
+    logger.error(`DB getVacancyBySourceExternal error: ${error.message}`);
+    return null;
+  }
+  return data || null;
+}
+
+/**
+ * Список вакансий. По умолчанию — только активные.
+ * Сортировка: created_at DESC (новые сверху).
+ */
+export async function listVacancies({ onlyActive = true } = {}) {
+  let query = supabase.from('vacancies').select('*');
+
+  if (onlyActive) {
+    query = query.eq('is_active', true);
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false });
+
+  if (error) {
+    logger.error(`DB listVacancies error: ${error.message}`);
+    return [];
+  }
+  return data || [];
+}
+
+/**
+ * Привязать отклик к вакансии (или отвязать, если vacancyId=null).
+ */
+export async function setApplicationVacancy(applicationId, vacancyId) {
+  const { error } = await supabase
+    .from('applications')
+    .update({ vacancy_id: vacancyId })
+    .eq('id', applicationId);
+
+  if (error) {
+    logger.error(`DB setApplicationVacancy error: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Создать или обновить вакансию (по UNIQUE source+external_id).
+ * Используется при сидировании из миграции и через админку.
+ */
+export async function upsertVacancy(vacancy) {
+  const payload = {
+    source: vacancy.source,
+    external_id: String(vacancy.external_id),
+    title: vacancy.title || null,
+    description: vacancy.description || null,
+    ai_prompt: vacancy.ai_prompt || null,
+    telegram_label: vacancy.telegram_label || null,
+    is_active: vacancy.is_active !== false, // по умолчанию активна
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabase
+    .from('vacancies')
+    .upsert(payload, { onConflict: 'source,external_id' });
+
+  if (error) {
+    logger.error(`DB upsertVacancy error: ${error.message}`);
+    throw error;
+  }
+}
+
 /**
  * Обновляет токены HH в БД.
  */

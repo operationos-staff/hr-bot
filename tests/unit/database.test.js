@@ -20,6 +20,10 @@ import {
   saveApplication,
   saveAiScore,
   getRanking,
+  getVacancyBySourceExternal,
+  listVacancies,
+  setApplicationVacancy,
+  upsertVacancy,
   _setSupabaseForTests,
 } from '../../src/services/database.js';
 
@@ -245,5 +249,169 @@ describe('saveAiScore', () => {
     await assert.rejects(
       () => saveAiScore('habr', '9', { score: 1, verdict: 'x', summary: 'y' })
     );
+  });
+});
+
+// ============================================================
+// Vacancies (D1) — модель «вакансия как first-class объект»
+// ============================================================
+
+describe('getVacancyBySourceExternal', () => {
+  let mock;
+  beforeEach(() => {
+    mock = makeMockClient();
+    _setSupabaseForTests(mock);
+  });
+
+  test('возвращает row при найденной вакансии', async () => {
+    const fixture = {
+      id: 'vac-uuid', source: 'habr', external_id: '1000164921',
+      title: 'PHP Developer', ai_prompt: 'Оценивай по PHP',
+    };
+    mock._setResult({ data: fixture, error: null });
+    const v = await getVacancyBySourceExternal('habr', '1000164921');
+    assert.deepEqual(v, fixture);
+  });
+
+  test('возвращает null если не найдена', async () => {
+    mock._setResult({ data: null, error: null });
+    const v = await getVacancyBySourceExternal('hh', 'absent');
+    assert.equal(v, null);
+  });
+
+  test('возвращает null при ошибке (не throw)', async () => {
+    mock._setResult({ data: null, error: { message: 'oops' } });
+    const v = await getVacancyBySourceExternal('habr', 'x');
+    assert.equal(v, null);
+  });
+
+  test('строит запрос: from(vacancies)→select→eq(source)→eq(external_id)→maybeSingle', async () => {
+    mock._setResult({ data: null, error: null });
+    await getVacancyBySourceExternal('hh', '999');
+    assert.deepEqual(mock._calls[0], ['from', 'vacancies']);
+    const eqCalls = mock._calls.filter(c => c[0] === 'eq');
+    assert.deepEqual(eqCalls[0], ['eq', 'source', 'hh']);
+    assert.deepEqual(eqCalls[1], ['eq', 'external_id', '999']);
+    assert.ok(mock._calls.find(c => c[0] === 'maybeSingle'), 'maybeSingle must be called');
+  });
+});
+
+describe('listVacancies', () => {
+  let mock;
+  beforeEach(() => {
+    mock = makeMockClient();
+    _setSupabaseForTests(mock);
+  });
+
+  test('по умолчанию возвращает только is_active=true', async () => {
+    mock._setResult({ data: [], error: null });
+    await listVacancies();
+    const eqCall = mock._calls.find(c => c[0] === 'eq' && c[1] === 'is_active');
+    assert.ok(eqCall, 'must filter by is_active');
+    assert.equal(eqCall[2], true);
+  });
+
+  test('onlyActive=false → не фильтрует по is_active', async () => {
+    mock._setResult({ data: [], error: null });
+    await listVacancies({ onlyActive: false });
+    const eqCall = mock._calls.find(c => c[0] === 'eq' && c[1] === 'is_active');
+    assert.equal(eqCall, undefined, 'must NOT filter is_active when onlyActive=false');
+  });
+
+  test('сортирует по created_at DESC', async () => {
+    mock._setResult({ data: [], error: null });
+    await listVacancies();
+    const orderCall = mock._calls.find(c => c[0] === 'order');
+    assert.ok(orderCall);
+    assert.equal(orderCall[1], 'created_at');
+    assert.equal(orderCall[2].ascending, false);
+  });
+
+  test('возвращает [] при ошибке', async () => {
+    mock._setResult({ data: null, error: { message: 'oops' } });
+    const result = await listVacancies();
+    assert.deepEqual(result, []);
+  });
+
+  test('возвращает массив вакансий при успехе', async () => {
+    const fixture = [
+      { id: '1', source: 'habr', title: 'PHP', is_active: true },
+      { id: '2', source: 'hh', title: 'amoCRM', is_active: true },
+    ];
+    mock._setResult({ data: fixture, error: null });
+    const result = await listVacancies();
+    assert.deepEqual(result, fixture);
+  });
+});
+
+describe('setApplicationVacancy', () => {
+  let mock;
+  beforeEach(() => {
+    mock = makeMockClient();
+    _setSupabaseForTests(mock);
+  });
+
+  test('успешный update не throws', async () => {
+    mock._setResult({ error: null });
+    await assert.doesNotReject(() =>
+      setApplicationVacancy('app-uuid', 'vac-uuid')
+    );
+  });
+
+  test('обновляет applications.vacancy_id по id', async () => {
+    mock._setResult({ error: null });
+    await setApplicationVacancy('app-uuid-1', 'vac-uuid-7');
+    assert.deepEqual(mock._calls[0], ['from', 'applications']);
+    const updateCall = mock._calls.find(c => c[0] === 'update');
+    assert.deepEqual(updateCall[1], { vacancy_id: 'vac-uuid-7' });
+    const eqCall = mock._calls.find(c => c[0] === 'eq');
+    assert.deepEqual(eqCall, ['eq', 'id', 'app-uuid-1']);
+  });
+
+  test('null vacancyId допустим (отвязка)', async () => {
+    mock._setResult({ error: null });
+    await setApplicationVacancy('app-uuid', null);
+    const updateCall = mock._calls.find(c => c[0] === 'update');
+    assert.equal(updateCall[1].vacancy_id, null);
+  });
+
+  test('error → throw', async () => {
+    mock._setResult({ error: { message: 'fk violation' } });
+    await assert.rejects(() => setApplicationVacancy('a', 'v'));
+  });
+});
+
+describe('upsertVacancy', () => {
+  let mock;
+  beforeEach(() => {
+    mock = makeMockClient();
+    _setSupabaseForTests(mock);
+  });
+
+  test('upsert с onConflict source+external_id', async () => {
+    mock._setResult({ error: null });
+    const vac = {
+      source: 'habr',
+      external_id: '1000164921',
+      title: 'PHP Developer',
+      description: 'Описание...',
+      ai_prompt: 'Оценивай PHP',
+      telegram_label: 'PHP',
+      is_active: true,
+    };
+    await upsertVacancy(vac);
+    const upsertCall = mock._calls.find(c => c[0] === 'upsert');
+    assert.ok(upsertCall, 'upsert must be called');
+    // Payload в первом аргументе
+    assert.equal(upsertCall[1].source, 'habr');
+    assert.equal(upsertCall[1].external_id, '1000164921');
+    assert.equal(upsertCall[1].title, 'PHP Developer');
+    // onConflict — во втором аргументе
+    assert.equal(upsertCall[2]?.onConflict, 'source,external_id');
+  });
+
+  test('error → throw', async () => {
+    mock._setResult({ error: { message: 'unique violation' } });
+    await assert.rejects(() => upsertVacancy({ source: 'habr', external_id: '1', title: 't' }));
   });
 });
