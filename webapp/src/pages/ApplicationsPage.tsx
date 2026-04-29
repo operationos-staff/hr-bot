@@ -126,7 +126,7 @@ export function ApplicationsPage() {
           className={cn(
             'shrink-0 rounded-full border px-3 py-1 text-[11px] font-medium transition-all',
             needsClarification
-              ? 'border-amber-500/60 bg-amber-500/15 text-amber-300'
+              ? 'border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-500/60 dark:bg-amber-500/15 dark:text-amber-300'
               : 'border-tg-border bg-tg-surface-2 text-tg-hint',
           )}
         >

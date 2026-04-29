@@ -167,10 +167,10 @@ function KpiTile({ label, value, suffix, icon, accent }: {
   icon?: React.ReactNode; accent?: 'emerald' | 'amber' | 'rose' | 'violet';
 }) {
   const map = {
-    emerald: 'from-emerald-500/15 text-emerald-300',
-    amber: 'from-amber-500/15 text-amber-300',
-    rose: 'from-rose-500/15 text-rose-300',
-    violet: 'from-violet-500/15 text-violet-300',
+    emerald: 'from-emerald-100 text-emerald-800 dark:from-emerald-500/15 dark:text-emerald-300',
+    amber: 'from-amber-100 text-amber-800 dark:from-amber-500/15 dark:text-amber-300',
+    rose: 'from-rose-100 text-rose-800 dark:from-rose-500/15 dark:text-rose-300',
+    violet: 'from-violet-100 text-violet-800 dark:from-violet-500/15 dark:text-violet-300',
   } as const;
   const cls = accent ? map[accent] : 'from-tg-surface-2 text-tg-text';
 

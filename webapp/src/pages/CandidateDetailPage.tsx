@@ -101,7 +101,7 @@ export function CandidateDetailPage() {
         <Card className="mt-3 border-violet-500/20 bg-gradient-to-br from-violet-500/5 to-transparent">
           <div className="mb-2 flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <Sparkles size={16} className="text-violet-300" /> AI-оценка тим-лида
+              <Sparkles size={16} className="text-violet-700 dark:text-violet-300" /> AI-оценка тим-лида
             </CardTitle>
             {c.ai_analyzed_at && <CardSub>{formatDate(c.ai_analyzed_at)}</CardSub>}
           </div>
@@ -116,11 +116,11 @@ export function CandidateDetailPage() {
           )}
 
           {c.ai_needs_clarification && c.ai_clarification && (
-            <div className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
-              <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-amber-300">
+            <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 dark:border-amber-500/30 dark:bg-amber-500/10">
+              <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
                 <AlertTriangle size={12} /> Уточнить у кандидата
               </p>
-              <p className="text-sm text-amber-100/90">{c.ai_clarification}</p>
+              <p className="text-sm text-amber-900 dark:text-amber-100/90">{c.ai_clarification}</p>
             </div>
           )}
 

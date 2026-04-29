@@ -5,11 +5,11 @@ type Variant = 'default' | 'success' | 'warn' | 'danger' | 'muted' | 'accent';
 
 const map: Record<Variant, string> = {
   default: 'bg-tg-surface-2 text-tg-text border-tg-border',
-  success: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  warn:    'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  danger:  'bg-rose-500/15 text-rose-300 border-rose-500/30',
+  success: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30',
+  warn:    'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30',
+  danger:  'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30',
   muted:   'bg-tg-surface-2 text-tg-hint border-tg-border',
-  accent:  'bg-blue-500/15 text-blue-300 border-blue-500/30',
+  accent:  'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-500/30',
 };
 
 export function Badge({

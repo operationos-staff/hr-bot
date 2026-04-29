@@ -38,18 +38,18 @@ export function truncate(s: string | null | undefined, n: number): string {
 
 export function scoreColor(score: number | null | undefined): string {
   if (score === null || score === undefined) return 'text-tg-hint';
-  if (score >= 9) return 'text-amber-400';
-  if (score >= 7) return 'text-emerald-400';
-  if (score >= 5) return 'text-yellow-400';
-  return 'text-rose-400';
+  if (score >= 9) return 'text-amber-700 dark:text-amber-400';
+  if (score >= 7) return 'text-emerald-700 dark:text-emerald-400';
+  if (score >= 5) return 'text-yellow-700 dark:text-yellow-400';
+  return 'text-rose-700 dark:text-rose-400';
 }
 
 export function scoreBg(score: number | null | undefined): string {
   if (score === null || score === undefined) return 'bg-tg-surface-2 text-tg-hint border-tg-border';
-  if (score >= 9) return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
-  if (score >= 7) return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
-  if (score >= 5) return 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30';
-  return 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+  if (score >= 9) return 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30';
+  if (score >= 7) return 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30';
+  if (score >= 5) return 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-500/15 dark:text-yellow-300 dark:border-yellow-500/30';
+  return 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30';
 }
 
 export function statusEmoji(qualified: boolean | null): string {
