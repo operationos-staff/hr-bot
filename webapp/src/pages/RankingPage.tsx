@@ -8,17 +8,19 @@ import { Button } from '@/components/ui/Button';
 import { RefreshCw, Trophy } from 'lucide-react';
 import { useState } from 'react';
 import { haptic } from '@/lib/telegram';
+import { useVacancy } from '@/lib/useVacancy';
 
 export function RankingPage() {
   const qc = useQueryClient();
   const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: api.settings.get });
+  const { selectedVacancyId } = useVacancy();
 
   const since = settings?.rankingSince;
   const limit = settings?.rankingLimit ?? 50;
 
-  const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ['ranking', since, limit],
-    queryFn: () => api.ranking({ since, limit }),
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['ranking', since, limit, selectedVacancyId],
+    queryFn: () => api.ranking({ since, limit, vacancyId: selectedVacancyId }),
     enabled: !!settings,
   });
 

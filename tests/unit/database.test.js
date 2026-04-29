@@ -201,6 +201,22 @@ describe('getRanking', () => {
     const result = await getRanking({});
     assert.deepEqual(result, fixture);
   });
+
+  // D5: фильтр по vacancy_id для Mini App страниц
+  test('vacancyId задан → добавляется .eq("vacancy_id", id)', async () => {
+    mock._setResult({ data: [], error: null });
+    await getRanking({ vacancyId: 'vac-uuid-1' });
+    const eqCall = mock._calls.find(c => c[0] === 'eq' && c[1] === 'vacancy_id');
+    assert.ok(eqCall, 'must filter by vacancy_id');
+    assert.equal(eqCall[2], 'vac-uuid-1');
+  });
+
+  test('vacancyId не задан → .eq("vacancy_id", ...) НЕ вызывается', async () => {
+    mock._setResult({ data: [], error: null });
+    await getRanking({});
+    const eqCall = mock._calls.find(c => c[0] === 'eq' && c[1] === 'vacancy_id');
+    assert.equal(eqCall, undefined);
+  });
 });
 
 // ============================================================

@@ -14,8 +14,10 @@ rankingRoutes.get('/', async (req, res, next) => {
   try {
     const since = req.query.since || config.ranking.since;
     const limit = Math.min(parseInt(req.query.limit, 10) || config.ranking.limit, 200);
-    const data = await getRanking({ since, limit });
-    res.json({ since, limit, count: data.length, items: data });
+    // D5: фильтр по вакансии для Mini App-страниц
+    const vacancyId = req.query.vacancy_id || null;
+    const data = await getRanking({ since, limit, vacancyId });
+    res.json({ since, limit, vacancyId, count: data.length, items: data });
   } catch (err) { next(err); }
 });
 

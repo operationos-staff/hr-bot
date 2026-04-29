@@ -60,7 +60,7 @@
   - `buildMessage(app, vacancy)` начинается с `[Вакансия: {vacancy.title}]`
   - Один канал — разделение через текст карточки
   - Тесты на разные вакансии в одном канале
-- [ ] D5. **API + Mini App — страницы по вакансиям**
+- [x] D5. **API + Mini App — страницы по вакансиям** — 2026-04-29 ✅
   - `GET /api/vacancies` — список активных
   - `GET /api/applications?vacancy_id=...` — фильтр
   - `GET /api/ranking?vacancy_id=...` — фильтр в существующем endpoint

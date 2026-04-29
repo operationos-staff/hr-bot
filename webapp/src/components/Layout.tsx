@@ -1,10 +1,13 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { BottomNav } from './BottomNav';
+import { VacancyPicker } from './VacancyPicker';
 import { useEffect } from 'react';
 import { applyTelegramTheme, tg } from '@/lib/telegram';
 
 export function Layout() {
   const location = useLocation();
+  // VacancyPicker показываем на основных страницах, прячем на детали кандидата и settings
+  const showVacancyPicker = !/^\/(candidate|settings)/.test(location.pathname);
 
   useEffect(() => {
     applyTelegramTheme();
@@ -30,6 +33,7 @@ export function Layout() {
   return (
     <div className="min-h-screen bg-tg-bg pb-[calc(72px+env(safe-area-inset-bottom))]">
       <main className="mx-auto max-w-2xl">
+        {showVacancyPicker && <VacancyPicker />}
         <Outlet />
       </main>
       <BottomNav />

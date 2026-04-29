@@ -9,6 +9,7 @@ import { Inbox, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Source, Status } from '@/lib/types';
 import { haptic } from '@/lib/telegram';
+import { useVacancy } from '@/lib/useVacancy';
 
 const STATUS_TABS: { value: Status; label: string }[] = [
   { value: 'all', label: 'Все' },
@@ -25,6 +26,7 @@ const SOURCE_TABS: { value: Source | 'all'; label: string }[] = [
 
 export function ApplicationsPage() {
   const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: api.settings.get });
+  const { selectedVacancyId } = useVacancy();
   const [status, setStatus] = useState<Status>('all');
   const [source, setSource] = useState<Source | 'all'>('all');
   const [search, setSearch] = useState('');
@@ -48,8 +50,9 @@ export function ApplicationsPage() {
   const params = useMemo(() => ({
     status, source, search: debouncedSearch,
     needsClarification: needsClarification || undefined,
+    vacancyId: selectedVacancyId,
     limit: 50, offset: 0,
-  }), [status, source, debouncedSearch, needsClarification]);
+  }), [status, source, debouncedSearch, needsClarification, selectedVacancyId]);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['applications', params],

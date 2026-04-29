@@ -15,7 +15,7 @@ const SELECT_FIELDS = `
 
 const LIST_SELECT_FIELDS = `
   source, external_id, candidate_name, candidate_url, application_url,
-  position, vacancy_title, location,
+  position, vacancy_title, vacancy_id, location,
   citizenship, citizenship_raw, experience_years,
   qualified, filter_reason,
   ai_score, ai_verdict, ai_needs_clarification,
@@ -41,6 +41,7 @@ applicationsRoutes.get('/', async (req, res, next) => {
       until,
       minScore,
       needsClarification,
+      vacancy_id,
     } = req.query;
 
     const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
@@ -69,6 +70,8 @@ applicationsRoutes.get('/', async (req, res, next) => {
     if (until)  q = q.lte('received_at', until);
     if (minScore) q = q.gte('ai_score', parseInt(minScore, 10));
     if (needsClarification === '1') q = q.eq('ai_needs_clarification', true);
+    // D5: фильтр по вакансии для Mini App-страниц
+    if (vacancy_id) q = q.eq('vacancy_id', String(vacancy_id));
 
     q = q.order('received_at', { ascending: false }).range(offset, offset + limit - 1);
 

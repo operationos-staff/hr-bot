@@ -18,6 +18,7 @@ import { rankingRoutes } from './routes/ranking.js';
 import { applicationsRoutes } from './routes/applications.js';
 import { statsRoutes } from './routes/stats.js';
 import { settingsRoutes } from './routes/settings.js';
+import { vacanciesRoutes } from './routes/vacancies.js';
 
 const app = express();
 
@@ -55,6 +56,7 @@ app.use('/api/ranking', rankingRoutes);
 app.use('/api/applications', applicationsRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/vacancies', vacanciesRoutes);
 
 // 404
 app.use((_req, res) => {

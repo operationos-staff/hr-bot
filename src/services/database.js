@@ -86,21 +86,28 @@ export async function getTopCandidates(limit = 10) {
  * @param {string} opts.since   ISO-строка (default: '2026-04-20T00:00:00Z')
  * @param {number} opts.limit   default: 100
  */
-export async function getRanking({ since = '2026-04-20T00:00:00Z', limit = 100 } = {}) {
+export async function getRanking({ since = '2026-04-20T00:00:00Z', limit = 100, vacancyId = null } = {}) {
   // ВАЖНО: .in('qualified', [true, null]) ломается в PostgREST —
   // null-литерал передаётся строкой "null" и Postgres не парсит его как boolean.
   // Используем .or() с is.null для корректной обработки null.
-  const { data, error } = await supabase
+  let query = supabase
     .from('applications')
     .select(`
       source, external_id, candidate_name, candidate_url, application_url,
-      position, vacancy_title, location, citizenship, citizenship_raw,
+      position, vacancy_title, vacancy_id, location, citizenship, citizenship_raw,
       experience_years, qualified, filter_reason,
       ai_score, ai_verdict, ai_summary, ai_needs_clarification, ai_clarification,
       received_at, created_at
     `)
     .or('qualified.is.null,qualified.eq.true')
-    .gte('received_at', since)
+    .gte('received_at', since);
+
+  // D5: фильтр по vacancy_id для Mini App-страниц per-vacancy
+  if (vacancyId) {
+    query = query.eq('vacancy_id', vacancyId);
+  }
+
+  const { data, error } = await query
     .order('ai_score', { ascending: false, nullsFirst: false })
     .order('experience_years', { ascending: false, nullsFirst: false })
     .order('received_at', { ascending: false })

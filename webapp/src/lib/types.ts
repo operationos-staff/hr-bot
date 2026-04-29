@@ -12,6 +12,7 @@ export interface CandidateBase {
   application_url: string | null;
   position: string | null;
   vacancy_title: string | null;
+  vacancy_id: string | null;
   location: string | null;
   citizenship: 'RU' | 'OTHER' | null;
   citizenship_raw: string | null;
@@ -23,6 +24,25 @@ export interface CandidateBase {
   ai_needs_clarification: boolean | null;
   received_at: string | null;
   created_at: string;
+}
+
+// D5: модель вакансии для Mini App-навигации
+export interface Vacancy {
+  id: string;
+  source: Source;
+  external_id: string;
+  title: string;
+  description: string | null;
+  ai_prompt: string | null;
+  telegram_label: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VacanciesResponse {
+  count: number;
+  items: Vacancy[];
 }
 
 export interface CandidateDetail extends CandidateBase {
