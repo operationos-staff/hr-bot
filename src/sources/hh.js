@@ -4,12 +4,16 @@
  *
  * Документация: https://api.hh.ru/openapi/redoc
  * OAuth 2.0 для работодателей: https://github.com/hhru/api/blob/master/docs/authorization_for_employers.md
+ *
+ * Тестируется через DI: getNewHHApplications принимает второй аргумент с моками
+ * fetchNegotiations / fetchResume / isEnabled / vacancyIds.
  */
 
 import axios from 'axios';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { saveHHTokens, getHHTokens } from '../services/database.js';
+import { normalizeHHNegotiation } from './hh-normalizer.js';
 
 const HH_API = 'https://api.hh.ru';
 const USER_AGENT = 'Bot_HH_Habr/1.0 (vladistsvetkov@gmail.com)';
@@ -61,6 +65,7 @@ async function hhRequest(path, params = {}) {
     const res = await axios.get(`${HH_API}${path}`, {
       headers: getHeaders(),
       params,
+      timeout: 15000,
     });
     return res.data;
   } catch (err) {
@@ -71,6 +76,7 @@ async function hhRequest(path, params = {}) {
       const res = await axios.get(`${HH_API}${path}`, {
         headers: getHeaders(),
         params,
+        timeout: 15000,
       });
       return res.data;
     }
@@ -79,7 +85,7 @@ async function hhRequest(path, params = {}) {
 }
 
 /**
- * Получает список новых откликов (negotiations) работодателя.
+ * Real fetch: список negotiations работодателя (опционально для одной вакансии).
  */
 export async function fetchHHNegotiations(vacancyId = null) {
   const params = {
@@ -87,9 +93,7 @@ export async function fetchHHNegotiations(vacancyId = null) {
     per_page: 50,
     page: 0,
     order_by: 'updated_at',
-    // status: 'response' — только первичные отклики
   };
-
   if (vacancyId) params.vacancy_id = vacancyId;
 
   const data = await hhRequest('/negotiations/employer', params);
@@ -97,83 +101,92 @@ export async function fetchHHNegotiations(vacancyId = null) {
 }
 
 /**
- * Получает полное резюме кандидата по ID.
- * Возвращает нормализованный объект.
+ * Real fetch: полное резюме кандидата по ID.
  */
 export async function fetchHHResume(resumeId) {
-  const data = await hhRequest(`/resumes/${resumeId}`);
-
-  // Гражданство — массив объектов [{id: '113', name: 'Россия'}, ...]
-  const citizenship = data.citizenship?.map(c => c.name).join(', ') || null;
-
-  // Опыт в месяцах
-  const experience_raw = data.total_experience?.months ?? null;
-
-  // Последняя должность
-  const position = data.title || data.experience?.[0]?.position || null;
-
-  // Локация
-  const location = data.area?.name || null;
-
-  return {
-    citizenship,
-    experience_raw, // число месяцев — parseExperienceYears умеет обрабатывать
-    position,
-    location,
-    citizenship_raw: citizenship,
-  };
+  return await hhRequest(`/resumes/${resumeId}`);
 }
 
 /**
- * Основная функция: собирает новые отклики с HH.
+ * Проверяет, настроены ли HH-credentials.
+ * @returns {boolean}
  */
-export async function getNewHHApplications(isNewFn) {
-  if (!config.hh.employerId || !config.hh.accessToken) {
+export function isHHEnabled() {
+  return Boolean(config.hh.employerId && config.hh.accessToken);
+}
+
+/**
+ * Default-зависимости — реальные функции, тесты передают моки через второй аргумент.
+ */
+const defaultDeps = {
+  isEnabled: isHHEnabled,
+  fetchNegotiations: fetchHHNegotiations,
+  fetchResume: fetchHHResume,
+  // vacancyIds: null  → берётся из config.hh.vacancyIds; [] → employer-wide; ['v1','v2'] → итерация
+};
+
+/**
+ * Основная функция: собирает новые отклики с HH.
+ *
+ * @param {Function} isNewFn  async (source, externalId) => boolean
+ * @param {Object}   [deps]   опционально для тестов:
+ *   - isEnabled() => bool
+ *   - fetchNegotiations(vacancyId|null) => Promise<Array>
+ *   - fetchResume(resumeId) => Promise<Object>
+ *   - vacancyIds?: Array<string>  явный список ID; если undefined — берётся из config
+ */
+export async function getNewHHApplications(isNewFn, deps = {}) {
+  const finalDeps = { ...defaultDeps, ...deps };
+
+  if (!finalDeps.isEnabled()) {
     logger.info('HH: not configured (Phase 2), skipping');
     return [];
   }
 
-  const allApplications = [];
+  // Резолвим список ID вакансий
+  const vacancyIds = Array.isArray(deps.vacancyIds) ? deps.vacancyIds : config.hh.vacancyIds;
 
-  let negotiations;
-  try {
-    negotiations = await fetchHHNegotiations();
-  } catch (err) {
-    logger.error(`HH: failed to fetch negotiations: ${err.message}`);
-    return [];
+  // Собираем все negotiations со всех вакансий
+  const allNegotiations = [];
+  if (!vacancyIds || vacancyIds.length === 0) {
+    // Один общий запрос (employer-wide)
+    try {
+      const negs = await finalDeps.fetchNegotiations(null);
+      allNegotiations.push(...(negs || []));
+    } catch (err) {
+      logger.error(`HH: fetchNegotiations failed: ${err.message}`);
+      return [];
+    }
+  } else {
+    for (const vid of vacancyIds) {
+      try {
+        const negs = await finalDeps.fetchNegotiations(vid);
+        allNegotiations.push(...(negs || []));
+      } catch (err) {
+        logger.error(`HH: fetchNegotiations(${vid}) failed: ${err.message}`);
+        // продолжаем с другими вакансиями
+      }
+    }
   }
 
-  for (const neg of negotiations) {
-    const external_id = String(neg.id);
-    const isNew = await isNewFn('hh', external_id);
+  // Дедуп + полное резюме + нормализация
+  const result = [];
+  for (const neg of allNegotiations) {
+    const externalId = String(neg.id);
+    const isNew = await isNewFn('hh', externalId);
     if (!isNew) continue;
 
-    const resumeId = neg.resume?.id;
-    let resumeData = {};
-
-    if (resumeId) {
+    let resume = null;
+    if (neg.resume?.id) {
       try {
-        resumeData = await fetchHHResume(resumeId);
+        resume = await finalDeps.fetchResume(neg.resume.id);
       } catch (err) {
-        logger.warn(`HH: failed to fetch resume ${resumeId}: ${err.message}`);
+        logger.warn(`HH: fetchResume(${neg.resume.id}) failed: ${err.message}`);
       }
     }
 
-    allApplications.push({
-      source: 'hh',
-      external_id,
-      candidate_name: neg.resume?.first_name
-        ? `${neg.resume.first_name} ${neg.resume.last_name || ''}`.trim()
-        : 'Имя не указано',
-      candidate_url: neg.resume?.alternate_url || null,
-      application_url: neg.alternate_url || null,
-      vacancy_title: neg.vacancy?.name || null,
-      cover_letter: neg.message || null,
-      received_at: neg.created_at || new Date().toISOString(),
-      ...resumeData,
-      raw_data: { neg, resumeData },
-    });
+    result.push(normalizeHHNegotiation(neg, resume));
   }
 
-  return allApplications;
+  return result;
 }

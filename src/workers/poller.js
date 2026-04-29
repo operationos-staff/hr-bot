@@ -9,19 +9,44 @@ import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 
 /**
+ * Default-зависимости — реальные импорты.
+ * В тестах передаём mock через второй аргумент в runPollCycle/processApplication.
+ */
+const defaultDeps = {
+  getNewHabrApplications,
+  getNewHHApplications,
+  filterApplication,
+  isApplicationExists,
+  saveApplication,
+  saveAiScore,
+  sendApplicationCard,
+  sendAlert,
+  sendAiAnalysis,
+  upsertPinnedRanking,
+  appendQualifiedCandidate,
+  refreshRankingSheet,
+  fetchCandidateFullText,
+  analyzeCandidate,
+  formatAiAnalysis,
+};
+
+/**
  * Функция-предикат для дедупликации: возвращает true если отклик НОВЫЙ.
  */
-async function isNew(source, externalId) {
-  if (!externalId) return false;
-  const exists = await isApplicationExists(source, String(externalId));
-  return !exists;
+function makeIsNew(deps) {
+  return async function isNew(source, externalId) {
+    if (!externalId) return false;
+    const exists = await deps.isApplicationExists(source, String(externalId));
+    return !exists;
+  };
 }
 
 /**
  * Обрабатывает один отклик: фильтрует, сохраняет, уведомляет.
+ * Экспортируется для тестов; вне TDD вызывается только из runPollCycle.
  */
-async function processApplication(raw) {
-  const filterResult = filterApplication(raw);
+export async function processApplication(raw, deps = defaultDeps) {
+  const filterResult = deps.filterApplication(raw);
 
   const app = {
     source: raw.source,
@@ -40,21 +65,21 @@ async function processApplication(raw) {
   };
 
   // 1. Сохраняем в БД (все — и прошедшие, и нет)
-  await saveApplication(app);
+  await deps.saveApplication(app);
 
   // 2. Уведомляем в Telegram (только ✅ и 🟡)
-  await sendApplicationCard(app);
+  await deps.sendApplicationCard(app);
 
   // 3. AI-анализ (только для ✅ и 🟡, если настроен DeepSeek)
   if (app.qualified !== false && config.deepseek?.apiKey) {
     try {
-      const resumeText = await fetchCandidateFullText(app.candidate_url, config.habr.cookie);
-      const analysis = await analyzeCandidate(app, resumeText);
+      const resumeText = await deps.fetchCandidateFullText(app.candidate_url, config.habr.cookie);
+      const analysis = await deps.analyzeCandidate(app, resumeText);
       if (analysis) {
-        const formatted = formatAiAnalysis(analysis);
-        await sendAiAnalysis(app, formatted);
+        const formatted = deps.formatAiAnalysis(analysis);
+        await deps.sendAiAnalysis(app, formatted);
         // Сохраняем score в Supabase
-        await saveAiScore(app.source, app.external_id, {
+        await deps.saveAiScore(app.source, app.external_id, {
           score: analysis.score,
           verdict: analysis.verdict,
           summary: analysis.summary,
@@ -68,7 +93,7 @@ async function processApplication(raw) {
   }
 
   // 4. Пишем в Google Sheets (только ✅ и 🟡)
-  await appendQualifiedCandidate(app);
+  await deps.appendQualifiedCandidate(app);
 
   const icon = app.qualified === true ? '✅' : app.qualified === null ? '🟡' : '❌';
   logger.info(`Processed ${icon} ${app.source}/${app.external_id} — ${app.candidate_name}`);
@@ -77,19 +102,20 @@ async function processApplication(raw) {
 /**
  * Один цикл опроса всех источников.
  */
-export async function runPollCycle() {
+export async function runPollCycle(deps = defaultDeps) {
   logger.info('--- Poll cycle started ---');
 
+  const isNew = makeIsNew(deps);
   let totalProcessed = 0;
 
   // --- Хабр Карьера ---
   try {
-    const habrApps = await getNewHabrApplications(isNew);
+    const habrApps = await deps.getNewHabrApplications(isNew);
     logger.info(`Habr: ${habrApps.length} new applications`);
 
     for (const app of habrApps) {
       try {
-        await processApplication(app);
+        await processApplication(app, deps);
         totalProcessed++;
       } catch (err) {
         logger.error(`Error processing Habr app ${app.external_id}: ${err.message}`);
@@ -97,19 +123,19 @@ export async function runPollCycle() {
     }
   } catch (err) {
     logger.error(`Habr poll failed: ${err.message}`);
-    if (err.message?.includes('cookie expired')) {
-      await sendAlert('🍪 Cookie Хабр Карьеры протух! Нужно обновить HABR_COOKIE в .env');
+    if (err.message?.includes('cookie expired') || err.message?.includes('cookie')) {
+      await deps.sendAlert('🍪 Cookie Хабр Карьеры протух! Нужно обновить HABR_COOKIE в .env').catch(() => {});
     }
   }
 
   // --- HeadHunter (Фаза 2) ---
   try {
-    const hhApps = await getNewHHApplications(isNew);
+    const hhApps = await deps.getNewHHApplications(isNew);
     logger.info(`HH: ${hhApps.length} new applications`);
 
     for (const app of hhApps) {
       try {
-        await processApplication(app);
+        await processApplication(app, deps);
         totalProcessed++;
       } catch (err) {
         logger.error(`Error processing HH app ${app.external_id}: ${err.message}`);
@@ -124,12 +150,12 @@ export async function runPollCycle() {
   // иначе зря дёргаем API.
   if (totalProcessed > 0) {
     try {
-      await refreshRankingSheet();
+      await deps.refreshRankingSheet();
     } catch (err) {
       logger.warn(`refreshRankingSheet failed: ${err.message}`);
     }
     try {
-      await upsertPinnedRanking();
+      await deps.upsertPinnedRanking();
     } catch (err) {
       logger.warn(`upsertPinnedRanking failed: ${err.message}`);
     }

@@ -55,6 +55,9 @@ export const config = {
     accessToken: process.env.HH_ACCESS_TOKEN || '',
     refreshToken: process.env.HH_REFRESH_TOKEN || '',
     employerId: process.env.HH_EMPLOYER_ID || '',
+    // ID вакансий через запятую: "999000111,888777666"
+    // Пусто → один общий запрос /negotiations/employer без vacancy_id
+    vacancyIds: (process.env.HH_VACANCY_IDS || '').split(',').map(s => s.trim()).filter(Boolean),
   },
   worker: {
     pollIntervalMs: parseInt(process.env.POLL_INTERVAL_MS || '300000', 10),

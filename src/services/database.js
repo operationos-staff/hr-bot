@@ -2,9 +2,19 @@ import { createClient } from '@supabase/supabase-js';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 
-const supabase = createClient(config.supabase.url, config.supabase.serviceKey);
+// `let` + live-binding ESM-экспорт позволяет тестам подменить клиент через _setSupabaseForTests.
+// В продакшне переменная остаётся реальным клиентом до конца жизни процесса.
+let supabase = createClient(config.supabase.url, config.supabase.serviceKey);
 
 export { supabase };
+
+/**
+ * Только для тестов: инжектит mock-клиент, имитирующий supabase-js API.
+ * НЕ ИСПОЛЬЗОВАТЬ в продакшн-коде.
+ */
+export function _setSupabaseForTests(client) {
+  supabase = client;
+}
 
 /**
  * Проверяет, существует ли уже отклик в БД.
