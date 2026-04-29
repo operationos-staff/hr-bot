@@ -9,6 +9,44 @@ const PIN_STATE_KEY = 'telegram_pinned_ranking_message_id';
 const TG_API = `https://api.telegram.org/bot${config.telegram.token}`;
 
 /**
+ * Строит URL для inline-кнопки «В Mini App».
+ *
+ * Приоритет — Direct Link Mini App: https://t.me/<bot>/<short>?startapp=<param>
+ * Эта ссылка открывает Mini App ВНУТРИ Telegram (с initData), даже когда
+ * нажата из канала, где web_app-кнопки запрещены API.
+ *
+ * Если bot_username или short_name не настроены — fallback на WEBAPP_URL
+ * (legacy-режим, кнопка откроет внешний браузер без initData).
+ *
+ * @param {Object|null} app — application; null для общей кнопки в pinned-сообщении
+ * @param {Object} opts
+ * @param {string} opts.botUsername       — без @, например "trat_hr_bot"
+ * @param {string} opts.miniAppShortName  — например "hr_app"
+ * @param {string} opts.webappUrl         — fallback URL фронта (legacy)
+ * @returns {string|null} URL для inline-button.url или null если ничего не настроено
+ */
+export function buildMiniAppLink(app, { botUsername, miniAppShortName, webappUrl } = {}) {
+  // Direct Link приоритет
+  if (botUsername && miniAppShortName) {
+    const base = `https://t.me/${botUsername}/${miniAppShortName}`;
+    if (!app) return base;
+    // startapp принимает только [a-zA-Z0-9_], никаких / : ? &
+    // → формат: candidate_<source>_<external_id>
+    const safeSource = String(app.source || '').replace(/[^a-zA-Z0-9]/g, '');
+    const safeId = String(app.external_id || '').replace(/[^a-zA-Z0-9]/g, '');
+    const startapp = `candidate_${safeSource}_${safeId}`;
+    return `${base}?startapp=${startapp}`;
+  }
+  // Legacy fallback на WEBAPP_URL
+  if (webappUrl) {
+    const base = webappUrl.replace(/\/$/, '');
+    if (!app) return base;
+    return `${base}/?candidate=${encodeURIComponent(`${app.source}/${app.external_id}`)}`;
+  }
+  return null;
+}
+
+/**
  * Формирует текст карточки отклика для Telegram.
  *
  * @param {Object}      app     — application
@@ -86,10 +124,15 @@ export async function sendApplicationCard(app, vacancy = null) {
       url,
     });
   }
-  // Кнопка-ссылка на Mini App (URL — работает в каналах, в DM откроет внутри Telegram)
-  if (config.api.publicUrl) {
-    const deeplink = `${config.api.publicUrl.replace(/\/$/, '')}/?candidate=${encodeURIComponent(app.source + '/' + app.external_id)}`;
-    buttons.push({ text: '📱 В Mini App', url: deeplink });
+  // Кнопка-ссылка на Mini App. Direct Link (t.me/<bot>/<short>) открывается
+  // ВНУТРИ Telegram даже из канала; legacy WEBAPP_URL — внешним браузером.
+  const miniAppUrl = buildMiniAppLink(app, {
+    botUsername: config.telegram.botUsername,
+    miniAppShortName: config.telegram.miniAppShortName,
+    webappUrl: config.api.publicUrl,
+  });
+  if (miniAppUrl) {
+    buttons.push({ text: '📱 В Mini App', url: miniAppUrl });
   }
   if (buttons.length) {
     payload.reply_markup = { inline_keyboard: [buttons] };
@@ -251,8 +294,15 @@ export async function upsertPinnedRanking() {
 
   const existingId = await getUiState(PIN_STATE_KEY).catch(() => null);
 
-  const replyMarkup = config.api.publicUrl
-    ? { inline_keyboard: [[{ text: '📱 Открыть Mini App', url: config.api.publicUrl }]] }
+  // Кнопка-ссылка на Mini App в pinned-сообщении.
+  // Direct Link приоритет — открывает внутри Telegram с initData.
+  const pinnedMiniAppUrl = buildMiniAppLink(null, {
+    botUsername: config.telegram.botUsername,
+    miniAppShortName: config.telegram.miniAppShortName,
+    webappUrl: config.api.publicUrl,
+  });
+  const replyMarkup = pinnedMiniAppUrl
+    ? { inline_keyboard: [[{ text: '📱 Открыть Mini App', url: pinnedMiniAppUrl }]] }
     : undefined;
 
   if (existingId) {

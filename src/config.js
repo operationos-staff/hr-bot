@@ -14,6 +14,11 @@ export const config = {
   telegram: {
     token: require_env('TELEGRAM_BOT_TOKEN'),
     channelId: require_env('TELEGRAM_CHANNEL_ID'),
+    // Direct Link Mini App: https://t.me/<botUsername>/<miniAppShortName>
+    // если задано — кнопки в карточках открывают Mini App внутри Telegram (с initData).
+    // Без этих полей — fallback на api.publicUrl, кнопка открывает внешний браузер.
+    botUsername: process.env.TELEGRAM_BOT_USERNAME || '',
+    miniAppShortName: process.env.TELEGRAM_MINI_APP_SHORT_NAME || '',
   },
   sheets: {
     spreadsheetId: process.env.GOOGLE_SHEETS_ID || '', // опционально — без него Sheets просто не пишется

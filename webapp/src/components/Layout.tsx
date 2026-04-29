@@ -1,17 +1,31 @@
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { BottomNav } from './BottomNav';
 import { VacancyPicker } from './VacancyPicker';
-import { useEffect } from 'react';
-import { applyTelegramTheme, tg } from '@/lib/telegram';
+import { useEffect, useRef } from 'react';
+import { applyTelegramTheme, tg, tgStartParam } from '@/lib/telegram';
 
 export function Layout() {
   const location = useLocation();
+  const nav = useNavigate();
+  const handledStartParam = useRef(false);
   // VacancyPicker показываем на основных страницах, прячем на детали кандидата и settings
   const showVacancyPicker = !/^\/(candidate|settings)/.test(location.pathname);
 
   useEffect(() => {
     applyTelegramTheme();
   }, []);
+
+  // Deep-link: ?startapp=candidate_<source>_<external_id> → /candidate/:source/:externalId
+  useEffect(() => {
+    if (handledStartParam.current) return;
+    if (!tgStartParam) return;
+    handledStartParam.current = true;
+    const m = /^candidate_([a-zA-Z0-9]+)_(.+)$/.exec(tgStartParam);
+    if (m) {
+      const [, source, externalId] = m;
+      nav(`/candidate/${source}/${externalId}`, { replace: true });
+    }
+  }, [nav]);
 
   // Скроллим наверх при переходе между табами
   useEffect(() => {
