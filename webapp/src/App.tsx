@@ -7,6 +7,8 @@ import { ApplicationsPage } from './pages/ApplicationsPage';
 import { CandidateDetailPage } from './pages/CandidateDetailPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { VacancyProvider } from './lib/useVacancy';
+import { isInTelegram } from './lib/telegram';
+import { OutsideTelegramGate } from './components/OutsideTelegramGate';
 
 const qc = new QueryClient({
   defaultOptions: {
@@ -19,6 +21,11 @@ const qc = new QueryClient({
 });
 
 export default function App() {
+  // Если фронт открыт ВНЕ Telegram (старые карточки канала с прежним URL),
+  // показываем заглушку с deeplink на бота вместо пустого экрана и 401-ошибок.
+  if (!isInTelegram) {
+    return <OutsideTelegramGate />;
+  }
   return (
     <QueryClientProvider client={qc}>
       <VacancyProvider>
