@@ -19,6 +19,7 @@ import { applicationsRoutes } from './routes/applications.js';
 import { statsRoutes } from './routes/stats.js';
 import { settingsRoutes } from './routes/settings.js';
 import { vacanciesRoutes } from './routes/vacancies.js';
+import { hhOauthRoutes } from './routes/hh-oauth.js';
 
 const app = express();
 
@@ -49,6 +50,9 @@ app.use((req, _res, next) => {
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
+
+// HH OAuth callback — публичный (HH редиректит без headers)
+app.use('/hh', hhOauthRoutes);
 
 // --- Authenticated ---
 app.use('/api', telegramAuth);

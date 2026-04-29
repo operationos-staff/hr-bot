@@ -26,9 +26,9 @@
 - [x] B4. Smoke-тест: `node --test tests/unit/*.test.js` — 183/183 зелёное
 
 ### Блок C — после одобрения заявки HH (#21003 «рассматривается»)
-- [ ] C0. **Новый роут `src/api/routes/hh-oauth.js` (api.assisthelp.ru/hh/callback)** —
+- [x] C0. **Новый роут `src/api/routes/hh-oauth.js` (api.assisthelp.ru/hh/callback)** — 2026-04-29 ✅
        принимает `?code=`, обменивает на access/refresh через POST /token,
-       сохраняет в `oauth_tokens`. Юнит-тесты на обмен (мок axios).
+       сохраняет в `oauth_tokens`. 9 юнит-тестов на exchangeHHCodeForToken.
 - [ ] C1. Прокинуть HH_CLIENT_ID, HH_CLIENT_SECRET, HH_EMPLOYER_ID, HH_VACANCY_IDS в `.env`
 - [ ] C2. Открыть `https://hh.ru/oauth/authorize?response_type=code&client_id=...&redirect_uri=https://api.assisthelp.ru/hh/callback`
        → callback сохранит токены в БД, poller подхватит автоматически

@@ -58,6 +58,8 @@ export const config = {
     // ID вакансий через запятую: "999000111,888777666"
     // Пусто → один общий запрос /negotiations/employer без vacancy_id
     vacancyIds: (process.env.HH_VACANCY_IDS || '').split(',').map(s => s.trim()).filter(Boolean),
+    // OAuth Redirect URI — должен совпадать с тем, что зарегистрирован в HH-приложении.
+    redirectUri: process.env.HH_REDIRECT_URI || 'https://api.assisthelp.ru/hh/callback',
   },
   worker: {
     pollIntervalMs: parseInt(process.env.POLL_INTERVAL_MS || '300000', 10),
