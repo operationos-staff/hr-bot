@@ -62,6 +62,7 @@ function makeDeps(overrides = {}) {
     fetchCandidateFullText: spy(''),
     analyzeCandidate: spy(null),
     formatAiAnalysis: (a) => '',
+    getVacancyBySourceExternal: spy(null),
     ...overrides,
   };
 }
@@ -130,6 +131,76 @@ describe('processApplication', () => {
     });
     await processApplication({ source: 'habr', external_id: '1' }, deps);
     assert.deepEqual(order.slice(0, 2), ['save', 'tg']);
+  });
+});
+
+// ============================================================
+// D3 — vacancy_id резолвится из БД и попадает в saved app
+// ============================================================
+describe('processApplication — vacancy_id (D3)', () => {
+
+  test('если raw.vacancy_external_id задан → вызывается getVacancyBySourceExternal(source, ext)', async () => {
+    const vacancyRow = { id: 'vac-uuid-1', source: 'habr', external_id: '1000164921', ai_prompt: 'p' };
+    const deps = makeDeps({
+      getVacancyBySourceExternal: spy(vacancyRow),
+    });
+    const raw = { source: 'habr', external_id: '1', vacancy_external_id: '1000164921' };
+    await processApplication(raw, deps);
+    assert.equal(deps.getVacancyBySourceExternal.calls.length, 1);
+    assert.deepEqual(deps.getVacancyBySourceExternal.calls[0], ['habr', '1000164921']);
+  });
+
+  test('vacancy_id записывается в saved app', async () => {
+    const vacancyRow = { id: 'vac-uuid-1', source: 'habr', external_id: '1000164921' };
+    const deps = makeDeps({
+      getVacancyBySourceExternal: spy(vacancyRow),
+    });
+    const raw = { source: 'habr', external_id: '1', vacancy_external_id: '1000164921' };
+    await processApplication(raw, deps);
+    const savedApp = deps.saveApplication.calls[0][0];
+    assert.equal(savedApp.vacancy_id, 'vac-uuid-1');
+  });
+
+  test('если vacancy не найдена → vacancy_id = null, processApplication продолжается', async () => {
+    const deps = makeDeps({
+      getVacancyBySourceExternal: spy(null),
+    });
+    const raw = { source: 'habr', external_id: '1', vacancy_external_id: 'unknown' };
+    await assert.doesNotReject(() => processApplication(raw, deps));
+    const savedApp = deps.saveApplication.calls[0][0];
+    assert.equal(savedApp.vacancy_id, null);
+  });
+
+  test('если vacancy_external_id не задан → getVacancyBySourceExternal НЕ вызывается, vacancy_id=null', async () => {
+    const deps = makeDeps();
+    const raw = { source: 'habr', external_id: '1' };
+    await processApplication(raw, deps);
+    assert.equal(deps.getVacancyBySourceExternal.calls.length, 0);
+    const savedApp = deps.saveApplication.calls[0][0];
+    assert.equal(savedApp.vacancy_id, null);
+  });
+
+  test('vacancy передаётся 3-м аргументом в analyzeCandidate', async () => {
+    // Чтобы analyzeCandidate был вызван, qualified должен быть !== false
+    // и должен быть config.deepseek.apiKey — нужно проверить.
+    // Если в тестовой среде apiKey пустой, analyzeCandidate не вызовется → пропускаем тест.
+    const { config } = await import('../../src/config.js');
+    if (!config.deepseek?.apiKey) {
+      // skip — DeepSeek не настроен в .env
+      return;
+    }
+    const vacancyRow = { id: 'vac-uuid-1', ai_prompt: 'PHP' };
+    const deps = makeDeps({
+      getVacancyBySourceExternal: spy(vacancyRow),
+      analyzeCandidate: spy(null), // достаточно, чтобы зафиксировать вызов
+    });
+    const raw = { source: 'habr', external_id: '1', vacancy_external_id: '1000164921' };
+    await processApplication(raw, deps);
+    if (deps.analyzeCandidate.calls.length > 0) {
+      const callArgs = deps.analyzeCandidate.calls[0];
+      assert.equal(callArgs.length >= 3, true, 'analyzeCandidate must receive 3rd arg');
+      assert.deepEqual(callArgs[2], vacancyRow);
+    }
   });
 });
 

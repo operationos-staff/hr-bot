@@ -3,7 +3,7 @@ import { getNewHHApplications } from '../sources/hh.js';
 import { filterApplication } from '../services/filter.js';
 import { sendApplicationCard, sendAlert, sendAiAnalysis, upsertPinnedRanking } from '../services/telegram.js';
 import { appendQualifiedCandidate, refreshRankingSheet } from '../services/sheets.js';
-import { isApplicationExists, saveApplication, saveAiScore } from '../services/database.js';
+import { isApplicationExists, saveApplication, saveAiScore, getVacancyBySourceExternal } from '../services/database.js';
 import { fetchCandidateFullText, analyzeCandidate, formatAiAnalysis } from '../services/ai-scorer.js';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
@@ -28,6 +28,7 @@ const defaultDeps = {
   fetchCandidateFullText,
   analyzeCandidate,
   formatAiAnalysis,
+  getVacancyBySourceExternal,
 };
 
 /**
@@ -48,6 +49,16 @@ function makeIsNew(deps) {
 export async function processApplication(raw, deps = defaultDeps) {
   const filterResult = deps.filterApplication(raw);
 
+  // D3: резолвим vacancy_id из БД по (source, vacancy_external_id), если задан
+  let vacancy = null;
+  if (raw.vacancy_external_id) {
+    try {
+      vacancy = await deps.getVacancyBySourceExternal(raw.source, raw.vacancy_external_id);
+    } catch (err) {
+      logger.warn(`vacancy lookup failed for ${raw.source}/${raw.vacancy_external_id}: ${err.message}`);
+    }
+  }
+
   const app = {
     source: raw.source,
     external_id: String(raw.external_id),
@@ -55,6 +66,7 @@ export async function processApplication(raw, deps = defaultDeps) {
     candidate_url: raw.candidate_url || null,
     application_url: raw.application_url || null,
     vacancy_title: raw.vacancy_title || null,
+    vacancy_id: vacancy?.id || null,
     position: raw.position || null,
     location: raw.location || null,
     cover_letter: raw.cover_letter || null,
@@ -70,11 +82,12 @@ export async function processApplication(raw, deps = defaultDeps) {
   // 2. Уведомляем в Telegram (только ✅ и 🟡)
   await deps.sendApplicationCard(app);
 
-  // 3. AI-анализ (только для ✅ и 🟡, если настроен DeepSeek)
+  // 3. AI-анализ (только для ✅ и 🟡, если настроен DeepSeek).
+  //    Per-vacancy промпт (D2) — vacancy идёт 3-м аргументом в analyzeCandidate.
   if (app.qualified !== false && config.deepseek?.apiKey) {
     try {
       const resumeText = await deps.fetchCandidateFullText(app.candidate_url, config.habr.cookie);
-      const analysis = await deps.analyzeCandidate(app, resumeText);
+      const analysis = await deps.analyzeCandidate(app, resumeText, vacancy);
       if (analysis) {
         const formatted = deps.formatAiAnalysis(analysis);
         await deps.sendAiAnalysis(app, formatted);

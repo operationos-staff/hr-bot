@@ -68,6 +68,7 @@ export function normalizeHHNegotiation(neg, resume) {
     candidate_url: neg.resume?.alternate_url || null,
     application_url: neg.alternate_url || null,
     vacancy_title: neg.vacancy?.name || null,
+    vacancy_external_id: neg.vacancy?.id != null ? String(neg.vacancy.id) : null,
     location: r.location,
     citizenship: r.citizenship,
     experience_raw: r.experience_raw,

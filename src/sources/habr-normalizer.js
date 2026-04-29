@@ -55,6 +55,7 @@ export function normalizeHabrResponse(item, vacancyTitle = null, vacancyId = nul
     candidate_url,
     application_url: vacancyId ? `${BASE_URL}/vacancies/${vacancyId}` : null,
     vacancy_title: vacancyTitle,
+    vacancy_external_id: vacancyId != null ? String(vacancyId) : null,
     position,
     location: author.location?.title || null,  // только город (страна в citizenships)
     citizenship,                                 // сырая строка, null если не указано

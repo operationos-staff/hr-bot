@@ -47,11 +47,11 @@
     - сидирование текущей PHP-вакансии (HABR_VACANCY_IDS=1000164921) с описанием из `vacancy.txt`
     - бэкфил: применить vacancy_id ко всем существующим habr-applications
   - Юнит-тесты `database.js`: `getVacancyBySourceExternal`, `listVacancies({onlyActive})`, `setApplicationVacancy`
-- [ ] D2. **ai-scorer.js per-vacancy промпт (TDD)**
+- [x] D2. **ai-scorer.js per-vacancy промпт (TDD)** — 2026-04-29 ✅
   - `buildPrompt(vacancy, candidate)` берёт `vacancy.ai_prompt` или дефолт
   - `analyzeCandidate(app, resumeText, vacancy)` — vacancy идёт сверху от poller
   - Тесты на выбор промпта по разным вакансиям
-- [ ] D3. **poller проставляет vacancy_id (TDD)**
+- [x] D3. **poller проставляет vacancy_id (TDD)** — 2026-04-29 ✅
   - habr-источник: vacancy_id из `vacancyId` (уже есть в normalizeHabrResponse)
   - hh-источник: vacancy_id из `neg.vacancy.id`
   - `processApplication` резолвит vacancy через `getVacancyBySourceExternal`, пишет в БД

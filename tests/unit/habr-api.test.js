@@ -200,12 +200,30 @@ describe('normalizeHabrResponse — должность (position)', () => {
   });
 });
 
+describe('normalizeHabrResponse — vacancy_external_id (D3)', () => {
+  test('vacancy_external_id = строка, если vacancyId передан', () => {
+    const r = normalizeHabrResponse(FIXTURE_RU, 'PHP-вакансия', '1000164921');
+    assert.equal(r.vacancy_external_id, '1000164921');
+    assert.equal(typeof r.vacancy_external_id, 'string');
+  });
+
+  test('vacancy_external_id = null если vacancyId не передан', () => {
+    const r = normalizeHabrResponse(FIXTURE_RU);
+    assert.equal(r.vacancy_external_id, null);
+  });
+
+  test('vacancyId число → приводится к строке', () => {
+    const r = normalizeHabrResponse(FIXTURE_RU, null, 1000164921);
+    assert.equal(r.vacancy_external_id, '1000164921');
+  });
+});
+
 describe('normalizeHabrResponse — целостность структуры', () => {
   test('все обязательные поля присутствуют', () => {
     const r = normalizeHabrResponse(FIXTURE_RU);
     const required = ['source', 'external_id', 'candidate_name', 'candidate_url',
       'location', 'citizenship', 'experience_raw', 'cover_letter',
-      'received_at', 'position', 'raw_data'];
+      'received_at', 'position', 'raw_data', 'vacancy_external_id'];
     for (const field of required) {
       assert.ok(field in r, `missing field: ${field}`);
     }

@@ -99,20 +99,10 @@ export async function fetchCandidateFullText(candidateUrl, cookie) {
 }
 
 /**
- * Анализирует кандидата через DeepSeek API.
- * Возвращает объект с оценкой и развёрнутым разбором.
+ * Сводка данных кандидата из raw API (Хабр-формат).
+ * Pure-функция, может пригодиться отдельно — но в основном используется в buildPromptForVacancy.
  */
-export async function analyzeCandidate(candidateData, resumeText) {
-  if (!config.deepseek?.apiKey) {
-    logger.debug('ai-scorer: DEEPSEEK_API_KEY not set, skipping');
-    return null;
-  }
-  if (!VACANCY_TEXT) {
-    logger.debug('ai-scorer: vacancy.txt not found, skipping');
-    return null;
-  }
-
-  // Собираем данные из API для дополнения текста резюме
+function buildCandidateSummary(candidateData, resumeText) {
   const apiData = candidateData.raw_data?.response?.author;
   const apiSummary = apiData ? `
 Данные из профиля:
@@ -124,26 +114,15 @@ export async function analyzeCandidate(candidateData, resumeText) {
 - История: ${apiData.companiesHistory?.map(c => `${c.companyName} (${c.experience})`).join('; ') || 'не указана'}
 ` : '';
 
-  const fullContext = resumeText
-    ? `${apiSummary}\n\nПолный текст резюме:\n${resumeText.slice(0, 6000)}`
-    : apiSummary;
+  return resumeText
+    ? `${apiSummary}\n\nПолный текст резюме:\n${String(resumeText).slice(0, 6000)}`
+    : apiSummary || `Кандидат: ${candidateData.candidate_name || 'не указан'}, опыт ${candidateData.experience_years ?? '?'} лет`;
+}
 
-  const prompt = `Ты — старший тим-лид и руководитель департамента разработки с 15+ летним опытом в международных IT-компаниях. Специализация: PHP-разработка, построение команд, найм.
+const DEFAULT_SYSTEM_PROMPT =
+  'Ты — старший технический руководитель с 15+ летним опытом найма. Оцени резюме кандидата честно и без воды.';
 
-Проанализируй кандидата на вакансию. Дай честную, детальную оценку как опытный технический руководитель — без воды, только по существу.
-
-ВАЖНО про неполные данные:
-- Если резюме сильное по большинству признаков, но каких-то ключевых данных не хватает (опыт, гражданство, конкретные технологии и т.д.) — поставь "needs_clarification": true и в "clarification" перечисли через ";" что именно нужно уточнить у кандидата. Score при этом ставь честно по тому, что видно (не занижай искусственно из-за пробелов).
-- Если данных хватает чтобы вынести однозначный вердикт — needs_clarification: false, clarification: "".
-- Для сильных, но недосказанных кандидатов используй verdict: "Уточнить и пригласить".
-
-=== ВАКАНСИЯ ===
-${VACANCY_TEXT}
-
-=== ДАННЫЕ КАНДИДАТА ===
-${fullContext}
-
-Ответь строго в формате JSON (без markdown, только JSON):
+const JSON_FORMAT_INSTRUCTION = `Ответь строго в формате JSON (без markdown, только JSON):
 {
   "score": <число от 1 до 10>,
   "verdict": "<одна строка: Приглашать на интервью / Уточнить и пригласить / Рассмотреть / Отказать>",
@@ -152,19 +131,78 @@ ${fullContext}
   "clarification": "<если needs_clarification=true — короткий список через ; что уточнить; иначе пустая строка>",
   "strengths": ["<сильная сторона 1>", "<сильная сторона 2>", ...],
   "concerns": ["<риск 1>", "<риск 2>", ...],
-  "key_skills_match": {
-    "PHP": <true/false>,
-    "Laravel/Symfony/CI": <true/false>,
-    "MySQL": <true/false>,
-    "Docker": <true/false>,
-    "Git": <true/false>,
-    "Vue.js": <true/false>,
-    "ООП/SOLID": <true/false>,
-    "PHPUnit": <true/false>
-  },
+  "key_skills_match": { "<навык>": <true/false>, ... },
   "interview_questions": ["<вопрос 1>", "<вопрос 2>", "<вопрос 3>"],
-  "summary": "<2-3 предложения итогового вывода тим-лида о кандидате>"
+  "summary": "<2-3 предложения итогового вывода о кандидате>"
 }`;
+
+const COMMON_INSTRUCTIONS = `ВАЖНО про неполные данные:
+- Если резюме сильное по большинству признаков, но каких-то ключевых данных не хватает (опыт, гражданство, конкретные технологии и т.д.) — поставь "needs_clarification": true и в "clarification" перечисли через ";" что именно нужно уточнить у кандидата. Score при этом ставь честно по тому, что видно (не занижай искусственно из-за пробелов).
+- Если данных хватает чтобы вынести однозначный вердикт — needs_clarification: false, clarification: "".
+- Для сильных, но недосказанных кандидатов используй verdict: "Уточнить и пригласить".`;
+
+/**
+ * Собирает финальный промпт для DeepSeek по вакансии и данным кандидата.
+ * Pure-функция — без сетевых вызовов, тестируется юнитами.
+ *
+ * @param {Object}      candidateData — application с raw_data
+ * @param {string|null} resumeText    — текст резюме (PDF→text), может быть null
+ * @param {Object|null} vacancy       — строка из vacancies (D1) с ai_prompt/description/title
+ * @returns {string|null} собранный промпт; null если ни vacancy ни VACANCY_TEXT недоступны
+ */
+export function buildPromptForVacancy(candidateData, resumeText, vacancy) {
+  const fullContext = buildCandidateSummary(candidateData, resumeText);
+
+  // Выбираем источник описания вакансии и системного промпта
+  let systemPrompt;
+  let vacancyText;
+
+  if (vacancy && (vacancy.ai_prompt || vacancy.description || vacancy.title)) {
+    systemPrompt = vacancy.ai_prompt || DEFAULT_SYSTEM_PROMPT;
+    vacancyText = vacancy.description || vacancy.title || '';
+  } else if (VACANCY_TEXT) {
+    // Backward-compat: vacancy не передана, но есть legacy vacancy.txt
+    systemPrompt = `Ты — старший тим-лид и руководитель департамента разработки с 15+ летним опытом в международных IT-компаниях. Специализация: PHP-разработка, построение команд, найм.
+
+Проанализируй кандидата на вакансию. Дай честную, детальную оценку как опытный технический руководитель — без воды, только по существу.`;
+    vacancyText = VACANCY_TEXT;
+  } else {
+    // Нет ни vacancy, ни legacy-файла — собрать промпт нечем
+    return null;
+  }
+
+  return `${systemPrompt}
+
+${COMMON_INSTRUCTIONS}
+
+=== ВАКАНСИЯ ===
+${vacancyText}
+
+=== ДАННЫЕ КАНДИДАТА ===
+${fullContext}
+
+${JSON_FORMAT_INSTRUCTION}`;
+}
+
+/**
+ * Анализирует кандидата через DeepSeek API.
+ * Возвращает объект с оценкой и развёрнутым разбором.
+ *
+ * @param {Object}      candidateData — application с raw_data
+ * @param {string|null} resumeText    — текст резюме (PDF→text)
+ * @param {Object|null} [vacancy]     — D1: строка из vacancies; null → fallback на VACANCY_TEXT
+ */
+export async function analyzeCandidate(candidateData, resumeText, vacancy = null) {
+  if (!config.deepseek?.apiKey) {
+    logger.debug('ai-scorer: DEEPSEEK_API_KEY not set, skipping');
+    return null;
+  }
+
+  const prompt = buildPromptForVacancy(candidateData, resumeText, vacancy);
+  if (!prompt) {
+    logger.debug('ai-scorer: no vacancy data (vacancy + VACANCY_TEXT both empty), skipping');
+    return null;
+  }
 
   try {
     const res = await axios.post(

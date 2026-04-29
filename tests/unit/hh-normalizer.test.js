@@ -293,6 +293,20 @@ describe('normalizeHHNegotiation — мерж resumeData', () => {
   });
 });
 
+describe('normalizeHHNegotiation — vacancy_external_id (D3)', () => {
+  test('vacancy_external_id = String(neg.vacancy.id)', () => {
+    const app = normalizeHHNegotiation(NEG_RU, RESUME_RU);
+    assert.equal(app.vacancy_external_id, '999000111');
+    assert.equal(typeof app.vacancy_external_id, 'string');
+  });
+
+  test('vacancy_external_id = null если neg.vacancy отсутствует', () => {
+    const neg = { ...NEG_RU, vacancy: null };
+    const app = normalizeHHNegotiation(neg, RESUME_RU);
+    assert.equal(app.vacancy_external_id, null);
+  });
+});
+
 describe('normalizeHHNegotiation — целостность', () => {
   test('все обязательные поля присутствуют', () => {
     const app = normalizeHHNegotiation(NEG_RU, RESUME_RU);
@@ -300,6 +314,7 @@ describe('normalizeHHNegotiation — целостность', () => {
       'source', 'external_id', 'candidate_name', 'candidate_url',
       'application_url', 'vacancy_title', 'location', 'citizenship',
       'experience_raw', 'cover_letter', 'received_at', 'position', 'raw_data',
+      'vacancy_external_id',
     ];
     for (const f of required) {
       assert.ok(f in app, `missing ${f}`);
