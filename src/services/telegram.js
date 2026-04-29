@@ -10,8 +10,18 @@ const TG_API = `https://api.telegram.org/bot${config.telegram.token}`;
 
 /**
  * Формирует текст карточки отклика для Telegram.
+ *
+ * @param {Object}      app     — application
+ * @param {Object|null} vacancy — D4: при наличии добавляет префикс
+ *                                «[Вакансия: <telegram_label или title>]» в начало,
+ *                                чтобы в одном канале не путаться между вакансиями.
  */
-function buildMessage(app) {
+export function buildMessage(app, vacancy = null) {
+  // D4: префикс с названием вакансии (один канал, разделение текстом)
+  const vacancyTag = vacancy && (vacancy.telegram_label || vacancy.title)
+    ? `[Вакансия: ${vacancy.telegram_label || vacancy.title}]\n`
+    : '';
+
   const statusEmoji = app.qualified === true ? '✅' : app.qualified === null ? '🟡' : '❌';
   const statusText = app.qualified === true
     ? 'Новый отклик'
@@ -36,7 +46,7 @@ function buildMessage(app) {
     : '';
 
   return (
-    `${statusEmoji} *${statusText} — ${sourceLabel}*\n\n` +
+    `${vacancyTag}${statusEmoji} *${statusText} — ${sourceLabel}*\n\n` +
     `👤 ${app.candidate_name || 'Имя не указано'}\n` +
     `💼 ${app.position || '—'}\n` +
     `🏢 Вакансия: ${app.vacancy_title || '—'}\n` +
@@ -49,14 +59,17 @@ function buildMessage(app) {
 /**
  * Отправляет карточку отклика в Telegram-канал.
  * Пропускает ❌ отклики (qualified=false) — они только в БД.
+ *
+ * @param {Object}      app     — application
+ * @param {Object|null} vacancy — D4: при наличии в карточке появляется префикс «[Вакансия: …]»
  */
-export async function sendApplicationCard(app) {
+export async function sendApplicationCard(app, vacancy = null) {
   if (app.qualified === false) {
     logger.debug(`Skipping TG send for filtered application: ${app.source}/${app.external_id}`);
     return;
   }
 
-  const text = buildMessage(app);
+  const text = buildMessage(app, vacancy);
   const url = app.candidate_url || app.application_url;
 
   const payload = {

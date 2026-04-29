@@ -79,8 +79,9 @@ export async function processApplication(raw, deps = defaultDeps) {
   // 1. Сохраняем в БД (все — и прошедшие, и нет)
   await deps.saveApplication(app);
 
-  // 2. Уведомляем в Telegram (только ✅ и 🟡)
-  await deps.sendApplicationCard(app);
+  // 2. Уведомляем в Telegram (только ✅ и 🟡).
+  //    D4: vacancy → префикс «[Вакансия: …]» в карточке (один канал).
+  await deps.sendApplicationCard(app, vacancy);
 
   // 3. AI-анализ (только для ✅ и 🟡, если настроен DeepSeek).
   //    Per-vacancy промпт (D2) — vacancy идёт 3-м аргументом в analyzeCandidate.

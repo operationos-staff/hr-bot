@@ -56,7 +56,7 @@
   - hh-источник: vacancy_id из `neg.vacancy.id`
   - `processApplication` резолвит vacancy через `getVacancyBySourceExternal`, пишет в БД
   - Тесты: `app.vacancy_id` корректно проставлен
-- [ ] D4. **Telegram-карточка с префиксом вакансии (TDD)**
+- [x] D4. **Telegram-карточка с префиксом вакансии (TDD)** — 2026-04-29 ✅
   - `buildMessage(app, vacancy)` начинается с `[Вакансия: {vacancy.title}]`
   - Один канал — разделение через текст карточки
   - Тесты на разные вакансии в одном канале
