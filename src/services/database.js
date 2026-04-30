@@ -192,6 +192,28 @@ export async function getVacancyBySourceExternal(source, externalId) {
 }
 
 /**
+ * Список external_id активных вакансий по источнику (E1).
+ * Используется в habr.js / hh.js, чтобы поллер брал список ID из БД,
+ * а не из .env. Тогда добавить вакансию = INSERT в vacancies, без рестарта.
+ *
+ * @param {'habr'|'hh'} source
+ * @returns {Promise<string[]>}
+ */
+export async function getActiveVacancyExternalIds(source) {
+  const { data, error } = await supabase
+    .from('vacancies')
+    .select('external_id')
+    .eq('source', source)
+    .eq('is_active', true);
+
+  if (error) {
+    logger.error(`DB getActiveVacancyExternalIds error: ${error.message}`);
+    return [];
+  }
+  return (data || []).map(row => String(row.external_id)).filter(Boolean);
+}
+
+/**
  * Список вакансий. По умолчанию — только активные.
  * Сортировка: created_at DESC (новые сверху).
  */

@@ -12,9 +12,10 @@
 import axios from 'axios';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
-import { saveHHTokens, getHHTokens } from '../services/database.js';
+import { saveHHTokens, getHHTokens, getActiveVacancyExternalIds } from '../services/database.js';
 import { normalizeHHNegotiation } from './hh-normalizer.js';
 import { paginate } from '../utils/paginate.js';
+import { resolveVacancyIds } from '../utils/resolve-vacancy-ids.js';
 
 const HH_API = 'https://api.hh.ru';
 const USER_AGENT = 'Bot_HH_Habr/1.0 (vladistsvetkov@gmail.com)';
@@ -144,6 +145,7 @@ export async function fetchHHNegotiations(vacancyId = null) {
   }
   // D9: пагинируемся по всем страницам (HH отдаёт по 50 на страницу).
   // maxPages=10 → до 500 откликов за один цикл, дальше дедупликация по БД.
+  // pageDelayMs=500 — снижает шанс получить ddos-guard timeout при 5+ вакансиях.
   const items = await paginate(async (page) => {
     const data = await hhRequest('/negotiations/response', {
       vacancy_id: vacancyId,
@@ -151,7 +153,7 @@ export async function fetchHHNegotiations(vacancyId = null) {
       page,
     });
     return data;
-  }, { perPage: 50, maxPages: 10 });
+  }, { perPage: 50, maxPages: 10, pageDelayMs: 500 });
   return items;
 }
 
@@ -201,8 +203,13 @@ export async function getNewHHApplications(isNewFn, deps = {}) {
     return [];
   }
 
-  // Резолвим список ID вакансий
-  const vacancyIds = Array.isArray(deps.vacancyIds) ? deps.vacancyIds : config.hh.vacancyIds;
+  // E2: Резолвим список ID вакансий — env (если задан) → БД vacancies → []
+  const vacancyIds = Array.isArray(deps.vacancyIds)
+    ? deps.vacancyIds
+    : await resolveVacancyIds(
+        config.hh.vacancyIds,
+        () => getActiveVacancyExternalIds('hh'),
+      );
 
   // Собираем все negotiations со всех вакансий
   const allNegotiations = [];

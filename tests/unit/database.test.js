@@ -24,6 +24,7 @@ import {
   listVacancies,
   setApplicationVacancy,
   upsertVacancy,
+  getActiveVacancyExternalIds,
   _setSupabaseForTests,
 } from '../../src/services/database.js';
 
@@ -394,6 +395,49 @@ describe('setApplicationVacancy', () => {
   test('error → throw', async () => {
     mock._setResult({ error: { message: 'fk violation' } });
     await assert.rejects(() => setApplicationVacancy('a', 'v'));
+  });
+});
+
+describe('getActiveVacancyExternalIds (E1)', () => {
+  let mock;
+  beforeEach(() => {
+    mock = makeMockClient();
+    _setSupabaseForTests(mock);
+  });
+
+  test('возвращает массив строк external_id для активных вакансий source', async () => {
+    mock._setResult({
+      data: [
+        { external_id: '1000164921' },
+        { external_id: '1000999111' },
+      ],
+      error: null,
+    });
+    const ids = await getActiveVacancyExternalIds('habr');
+    assert.deepEqual(ids, ['1000164921', '1000999111']);
+  });
+
+  test('фильтр по source и is_active=true', async () => {
+    mock._setResult({ data: [], error: null });
+    await getActiveVacancyExternalIds('hh');
+    assert.deepEqual(mock._calls[0], ['from', 'vacancies']);
+    const eqCalls = mock._calls.filter(c => c[0] === 'eq');
+    const sourceCall = eqCalls.find(c => c[1] === 'source');
+    const activeCall = eqCalls.find(c => c[1] === 'is_active');
+    assert.deepEqual(sourceCall, ['eq', 'source', 'hh']);
+    assert.deepEqual(activeCall, ['eq', 'is_active', true]);
+  });
+
+  test('возвращает [] при пустом результате', async () => {
+    mock._setResult({ data: [], error: null });
+    const ids = await getActiveVacancyExternalIds('habr');
+    assert.deepEqual(ids, []);
+  });
+
+  test('возвращает [] при ошибке (не throws)', async () => {
+    mock._setResult({ data: null, error: { message: 'oops' } });
+    const ids = await getActiveVacancyExternalIds('habr');
+    assert.deepEqual(ids, []);
   });
 });
 

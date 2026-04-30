@@ -13,6 +13,8 @@ import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { sleep } from '../utils/helpers.js';
 import { normalizeHabrResponse } from './habr-normalizer.js';
+import { getActiveVacancyExternalIds } from '../services/database.js';
+import { resolveVacancyIds } from '../utils/resolve-vacancy-ids.js';
 
 export { normalizeHabrResponse }; // re-export для удобства
 
@@ -66,10 +68,14 @@ export async function fetchResponsesPage(vacancyId, page = 1) {
  * @returns {Array}
  */
 export async function getNewHabrApplications(isNewFn) {
-  const vacancyIds = config.habr.vacancyIds;
+  // E2: если HABR_VACANCY_IDS не задан в .env — берём список из БД (vacancies таблица)
+  const vacancyIds = await resolveVacancyIds(
+    config.habr.vacancyIds,
+    () => getActiveVacancyExternalIds('habr'),
+  );
 
   if (!vacancyIds?.length) {
-    logger.warn('Habr: HABR_VACANCY_IDS not configured, skipping');
+    logger.warn('Habr: ни в .env, ни в БД нет активных вакансий — skipping');
     return [];
   }
 
