@@ -114,6 +114,12 @@ async function hhRequest(path, params = {}) {
       });
       return res.data;
     }
+    // Логируем тело ошибки HH (для 4xx это обычно полезный JSON с причиной)
+    if (err.response?.data) {
+      try {
+        logger.error(`HH ${status} body: ${JSON.stringify(err.response.data)}`);
+      } catch { /* ignore */ }
+    }
     throw err;
   }
 }
