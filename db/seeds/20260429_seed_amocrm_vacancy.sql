@@ -1,16 +1,14 @@
 -- ==========================================
--- SEED: вакансия amoCRM на HH (Острова Сокровищ)
--- Применяется руками после одобрения HH-приложения и создания вакансии.
---
--- Перед запуском:
---   1. Замени <HH_VACANCY_ID> на ID из URL hh.ru/vacancy/{ID}
---   2. (опционально) Подправь ai_prompt под актуальные требования
+-- SEED: вакансия amoCRM на HH (Острова Сокровищ, employer_id 11593524)
+-- HH vacancy: https://hh.ru/vacancy/132556253
+-- Применить руками: Supabase Dashboard → SQL Editor → вставить весь файл → Run.
+-- Идемпотентно: повторный запуск перезапишет description/ai_prompt.
 -- ==========================================
 
 INSERT INTO vacancies (source, external_id, title, description, ai_prompt, telegram_label, is_active)
 VALUES (
   'hh',
-  '<HH_VACANCY_ID>',  -- замени на ID
+  '132556253',  -- замени на ID
   'Технический специалист (amoCRM / автоматизации)',
   $$📌 ВАКАНСИЯ: Технический специалист (amoCRM / автоматизации) с функцией клиентской поддержки
 Компания: Остров Сокровищ
@@ -98,4 +96,4 @@ ON CONFLICT (source, external_id) DO UPDATE SET
 -- Проверка: должна появиться запись
 SELECT id, source, external_id, title, telegram_label, is_active
 FROM vacancies
-WHERE source = 'hh' AND external_id = '<HH_VACANCY_ID>';
+WHERE source = 'hh' AND external_id = '132556253';
