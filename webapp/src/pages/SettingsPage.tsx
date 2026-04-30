@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardSub, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { Save, RefreshCw, Settings as SettingsIcon, Calendar, Hash } from 'lucide-react';
+import { Save, RefreshCw, Settings as SettingsIcon, Calendar, Hash, Briefcase, ChevronRight } from 'lucide-react';
 import type { AppSettings, Source, Status } from '@/lib/types';
 import { tg, tgUser, haptic } from '@/lib/telegram';
 
 export function SettingsPage() {
   const qc = useQueryClient();
+  const nav = useNavigate();
   const { data: server, isLoading } = useQuery({ queryKey: ['settings'], queryFn: api.settings.get });
 
   const [form, setForm] = useState<AppSettings | null>(null);
@@ -66,6 +68,23 @@ export function SettingsPage() {
           <p className="truncate text-sm font-semibold">{tgUser?.first_name || 'Пользователь'} {tgUser?.last_name || ''}</p>
           <p className="text-xs text-tg-hint">@{tgUser?.username || '—'} · id {tgUser?.id || '—'}</p>
         </div>
+      </Card>
+
+      {/* Управление вакансиями */}
+      <Card className="mt-3">
+        <button
+          onClick={() => { haptic('light'); nav('/vacancies'); }}
+          className="-m-4 flex w-[calc(100%+2rem)] items-center gap-3 p-4 text-left hover:bg-tg-surface-2/50 transition rounded-2xl"
+        >
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-tg-accent/15 text-tg-accent">
+            <Briefcase size={18} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-tg-text">Управление вакансиями</p>
+            <p className="text-xs text-tg-hint">Добавить новую, включить/выключить мониторинг</p>
+          </div>
+          <ChevronRight size={18} className="text-tg-hint" />
+        </button>
       </Card>
 
       {/* Период рейтинга */}

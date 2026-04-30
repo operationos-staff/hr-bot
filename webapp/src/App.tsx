@@ -6,6 +6,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { ApplicationsPage } from './pages/ApplicationsPage';
 import { CandidateDetailPage } from './pages/CandidateDetailPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { VacanciesPage } from './pages/VacanciesPage';
 import { VacancyProvider } from './lib/useVacancy';
 import { isInTelegram } from './lib/telegram';
 import { OutsideTelegramGate } from './components/OutsideTelegramGate';
@@ -36,6 +37,7 @@ export default function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/inbox" element={<ApplicationsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/vacancies" element={<VacanciesPage />} />
               <Route path="/candidate/:source/:externalId" element={<CandidateDetailPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>

@@ -8,8 +8,8 @@ export function Layout() {
   const location = useLocation();
   const nav = useNavigate();
   const handledStartParam = useRef(false);
-  // VacancyPicker показываем на основных страницах, прячем на детали кандидата и settings
-  const showVacancyPicker = !/^\/(candidate|settings)/.test(location.pathname);
+  // VacancyPicker показываем на основных страницах, прячем на детали кандидата, settings и vacancies
+  const showVacancyPicker = !/^\/(candidate|settings|vacancies)/.test(location.pathname);
 
   useEffect(() => {
     applyTelegramTheme();

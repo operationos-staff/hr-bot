@@ -65,12 +65,45 @@ export const api = {
     return http<ApplicationsResponse>(`/api/applications?${qs}`);
   },
 
-  // D5: вакансии для навигации Mini App
-  vacancies: (onlyActive: boolean = true) => {
-    const qs = new URLSearchParams();
-    qs.set('onlyActive', onlyActive ? '1' : '0');
-    return http<VacanciesResponse>(`/api/vacancies?${qs}`);
-  },
+  // D5/E4: вакансии для навигации Mini App + CRUD
+  vacancies: Object.assign(
+    (onlyActive: boolean = true) => {
+      const qs = new URLSearchParams();
+      qs.set('onlyActive', onlyActive ? '1' : '0');
+      return http<VacanciesResponse>(`/api/vacancies?${qs}`);
+    },
+    {
+      list: (onlyActive: boolean = true) => {
+        const qs = new URLSearchParams();
+        qs.set('onlyActive', onlyActive ? '1' : '0');
+        return http<VacanciesResponse>(`/api/vacancies?${qs}`);
+      },
+      create: (payload: {
+        source: 'habr' | 'hh';
+        external_id: string;
+        title: string;
+        description?: string;
+        ai_prompt?: string;
+        telegram_label?: string;
+        is_active?: boolean;
+      }) =>
+        http<{ ok: true; vacancy: any }>('/api/vacancies', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        }),
+      patch: (id: string, patch: Partial<{
+        title: string;
+        description: string;
+        ai_prompt: string;
+        telegram_label: string;
+        is_active: boolean;
+      }>) =>
+        http<{ ok: true; vacancy: any }>(`/api/vacancies/${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify(patch),
+        }),
+    },
+  ),
 
   candidate: (source: string, externalId: string) =>
     http<CandidateDetail>(`/api/applications/${encodeURIComponent(source)}/${encodeURIComponent(externalId)}`),

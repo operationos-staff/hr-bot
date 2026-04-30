@@ -15,6 +15,7 @@
     "ai:analyze": "node scripts/analyze-existing.js",
     "ranking:rebuild": "node scripts/rebuild-ranking.js",
     "ranking:top": "node scripts/top-candidates.js",
+    "vacancy:add": "node scripts/add-vacancy.js",
     "db:schema": "echo 'Применить db/schema.sql через Supabase Dashboard или psql'"
   },
   "dependencies": {
