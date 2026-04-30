@@ -125,18 +125,29 @@ async function hhRequest(path, params = {}) {
 }
 
 /**
- * Real fetch: список negotiations работодателя (опционально для одной вакансии).
+ * Real fetch: список «неразобранных» откликов работодателя на конкретную вакансию.
+ *
+ * Endpoint: GET /negotiations/response?vacancy_id=...&page=0&per_page=50
+ * Это статус «Все неразобранные» в HR-кабинете — то что нам нужно (новые отклики).
+ *
+ * Если HR-менеджер в кабинете перевёл отклик в другой статус (consider/discard/etc),
+ * он перестаёт возвращаться этим endpoint'ом — но в нашей БД он уже есть, дедупликация
+ * через external_id предотвратит повторную обработку.
+ *
+ * Старый /negotiations/employer возвращает 404 — устарел.
  */
 export async function fetchHHNegotiations(vacancyId = null) {
+  if (!vacancyId) {
+    logger.warn('HH: fetchHHNegotiations called without vacancyId — endpoint /negotiations/response требует vacancy_id');
+    return [];
+  }
   const params = {
-    employer_id: config.hh.employerId,
+    vacancy_id: vacancyId,
     per_page: 50,
     page: 0,
-    order_by: 'updated_at',
   };
-  if (vacancyId) params.vacancy_id = vacancyId;
 
-  const data = await hhRequest('/negotiations/employer', params);
+  const data = await hhRequest('/negotiations/response', params);
   return data.items || [];
 }
 
