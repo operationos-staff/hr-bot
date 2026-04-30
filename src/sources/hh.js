@@ -19,6 +19,7 @@ const HH_API = 'https://api.hh.ru';
 const USER_AGENT = 'Bot_HH_Habr/1.0 (vladistsvetkov@gmail.com)';
 
 let currentAccessToken = config.hh.accessToken;
+let tokenLoaded = !!config.hh.accessToken; // true если токен уже есть в env
 
 function getHeaders() {
   return {
@@ -26,6 +27,28 @@ function getHeaders() {
     'User-Agent': USER_AGENT,
     'HH-User-Agent': USER_AGENT,
   };
+}
+
+/**
+ * Ленивая загрузка токена из БД при первом запросе.
+ * Сценарий: процесс стартанул, .env пустой по HH_ACCESS_TOKEN, токены лежат в
+ * Supabase oauth_tokens (туда их положил OAuth callback). Без этой функции
+ * первый hhRequest пошёл бы с пустым Bearer и получил 403 (а не 401),
+ * refreshAccessToken не сработал бы.
+ */
+async function ensureTokenLoaded() {
+  if (tokenLoaded) return;
+  const tokens = await getHHTokens();
+  if (tokens?.access_token) {
+    currentAccessToken = tokens.access_token;
+    logger.info('HH: access_token loaded from DB');
+  } else if (config.hh.refreshToken || tokens?.refresh_token) {
+    // access_token нет, но есть refresh — обновляем сразу
+    await refreshAccessToken();
+  } else {
+    logger.warn('HH: no access_token and no refresh_token — пройди OAuth-flow на /hh/callback');
+  }
+  tokenLoaded = true;
 }
 
 /**
@@ -50,6 +73,7 @@ async function refreshAccessToken() {
 
   const { access_token, refresh_token, expires_in } = res.data;
   currentAccessToken = access_token;
+  tokenLoaded = true;
 
   const expiresAt = new Date(Date.now() + expires_in * 1000).toISOString();
   await saveHHTokens({ accessToken: access_token, refreshToken: refresh_token, expiresAt });
@@ -58,9 +82,11 @@ async function refreshAccessToken() {
 }
 
 /**
- * Выполняет запрос к HH API с автообновлением токена при 401.
+ * Выполняет запрос к HH API с автообновлением токена при 401/403-bad_authorization.
  */
 async function hhRequest(path, params = {}) {
+  await ensureTokenLoaded();
+
   try {
     const res = await axios.get(`${HH_API}${path}`, {
       headers: getHeaders(),
@@ -69,8 +95,16 @@ async function hhRequest(path, params = {}) {
     });
     return res.data;
   } catch (err) {
-    if (err.response?.status === 401) {
-      logger.warn('HH: 401, refreshing token and retrying...');
+    const status = err.response?.status;
+    const errType = err.response?.data?.errors?.[0]?.value || err.response?.data?.oauth_error;
+    // 401 — стандартный «токен невалиден»
+    // 403 + token_revoked / bad_authorization — HH иногда возвращает именно так,
+    // когда токен отозван или с истекшим сроком. Тоже пробуем рефрешить.
+    const isAuthError = status === 401 ||
+      (status === 403 && /token_revoked|bad_authorization/i.test(String(errType)));
+
+    if (isAuthError) {
+      logger.warn(`HH: ${status} (${errType || 'unknown'}), refreshing token and retrying...`);
       await refreshAccessToken();
 
       const res = await axios.get(`${HH_API}${path}`, {
