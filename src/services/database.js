@@ -97,6 +97,7 @@ export async function getRanking({ since = '2026-04-20T00:00:00Z', limit = 100, 
       position, vacancy_title, vacancy_id, location, citizenship, citizenship_raw,
       experience_years, qualified, filter_reason,
       ai_score, ai_verdict, ai_summary, ai_needs_clarification, ai_clarification,
+      processed_at, processed_by,
       received_at, created_at
     `)
     .or('qualified.is.null,qualified.eq.true')

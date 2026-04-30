@@ -5,7 +5,7 @@ import { Avatar } from './ui/Avatar';
 import { ScoreRing } from './ui/ScoreRing';
 import { ChevronRight, MapPin, Briefcase, Clock, Check } from 'lucide-react';
 import type { CandidateBase } from '@/lib/types';
-import { formatRelative, sourceLabel, statusEmoji, statusLabel, truncate } from '@/lib/utils';
+import { formatDate, formatRelative, sourceLabel, statusEmoji, statusLabel, truncate } from '@/lib/utils';
 import { haptic } from '@/lib/telegram';
 
 export function CandidateCard({ c, rank }: { c: CandidateBase; rank?: number }) {
@@ -69,9 +69,11 @@ export function CandidateCard({ c, rank }: { c: CandidateBase; rank?: number }) 
                 </span>
               )}
               {c.received_at && (
-                <span className="inline-flex items-center gap-1">
+                <span className="inline-flex items-center gap-1" title={formatDate(c.received_at)}>
                   <Clock size={12} />
-                  {formatRelative(c.received_at)}
+                  {formatDate(c.received_at, { day: '2-digit', month: 'short' })}
+                  <span className="text-tg-hint/60">·</span>
+                  <span>{formatRelative(c.received_at)}</span>
                 </span>
               )}
             </div>
