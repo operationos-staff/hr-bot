@@ -275,6 +275,33 @@ export async function upsertVacancy(vacancy) {
 }
 
 /**
+ * Отмечает отклик как «обработан» (F2) — или снимает метку.
+ *
+ * @param {string} source         — 'habr' | 'hh'
+ * @param {string} externalId     — id отклика в источнике
+ * @param {Object} opts
+ * @param {string} opts.by        — кто отметил (Telegram username из req.tgUser)
+ * @param {boolean} opts.value    — true: пометить, false: снять метку
+ */
+export async function markApplicationProcessed(source, externalId, { by, value }) {
+  const payload = value
+    ? { processed_at: new Date().toISOString(), processed_by: by || null }
+    : { processed_at: null, processed_by: null };
+
+  const { error } = await supabase
+    .from('applications')
+    .update(payload)
+    .eq('source', source)
+    .eq('external_id', String(externalId));
+
+  if (error) {
+    logger.error(`DB markApplicationProcessed error: ${error.message}`);
+    throw error;
+  }
+  logger.info(`Application ${source}/${externalId} processed=${value} by=${by || '-'}`);
+}
+
+/**
  * Обновляет токены HH в БД.
  */
 export async function saveHHTokens({ accessToken, refreshToken, expiresAt }) {

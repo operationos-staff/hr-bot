@@ -91,6 +91,10 @@ export function applyTelegramTheme() {
     if (v) root.style.setProperty(k, v);
   }
   document.documentElement.classList.toggle('dark', tg.colorScheme === 'dark');
+  // Ключевая правка: говорим браузеру рендерить нативные виджеты
+  // (input type=date / number / select) в правильной цветовой схеме.
+  // Без этого они в dark-теме остаются белыми с чёрным текстом.
+  root.style.colorScheme = tg.colorScheme === 'dark' ? 'dark' : 'light';
 
   // Разворачиваем во весь экран и красим бары
   try { tg.ready(); } catch {/**/}

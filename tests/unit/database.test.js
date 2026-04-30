@@ -25,6 +25,7 @@ import {
   setApplicationVacancy,
   upsertVacancy,
   getActiveVacancyExternalIds,
+  markApplicationProcessed,
   _setSupabaseForTests,
 } from '../../src/services/database.js';
 
@@ -438,6 +439,50 @@ describe('getActiveVacancyExternalIds (E1)', () => {
     mock._setResult({ data: null, error: { message: 'oops' } });
     const ids = await getActiveVacancyExternalIds('habr');
     assert.deepEqual(ids, []);
+  });
+});
+
+describe('markApplicationProcessed (F2)', () => {
+  let mock;
+  beforeEach(() => {
+    mock = makeMockClient();
+    _setSupabaseForTests(mock);
+  });
+
+  test('processed=true → ставит processed_at = now() ISO + processed_by', async () => {
+    mock._setResult({ error: null });
+    await markApplicationProcessed('habr', '4516024', { by: 'vladislav', value: true });
+    const updateCall = mock._calls.find(c => c[0] === 'update');
+    assert.ok(updateCall);
+    const payload = updateCall[1];
+    assert.equal(typeof payload.processed_at, 'string');
+    assert.match(payload.processed_at, /^\d{4}-\d{2}-\d{2}T/);
+    assert.equal(payload.processed_by, 'vladislav');
+  });
+
+  test('processed=false → processed_at = null + processed_by = null (снять метку)', async () => {
+    mock._setResult({ error: null });
+    await markApplicationProcessed('habr', '4516024', { by: 'vladislav', value: false });
+    const updateCall = mock._calls.find(c => c[0] === 'update');
+    assert.equal(updateCall[1].processed_at, null);
+    assert.equal(updateCall[1].processed_by, null);
+  });
+
+  test('фильтр по source + external_id', async () => {
+    mock._setResult({ error: null });
+    await markApplicationProcessed('hh', '5263801800', { by: 'x', value: true });
+    const eqCalls = mock._calls.filter(c => c[0] === 'eq');
+    const sourceEq = eqCalls.find(c => c[1] === 'source');
+    const idEq = eqCalls.find(c => c[1] === 'external_id');
+    assert.deepEqual(sourceEq, ['eq', 'source', 'hh']);
+    assert.deepEqual(idEq, ['eq', 'external_id', '5263801800']);
+  });
+
+  test('error в Supabase → throw', async () => {
+    mock._setResult({ error: { message: 'permission denied' } });
+    await assert.rejects(
+      () => markApplicationProcessed('habr', '1', { by: 'x', value: true })
+    );
   });
 });
 

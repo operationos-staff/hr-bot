@@ -22,6 +22,8 @@ export interface CandidateBase {
   ai_score: number | null;
   ai_verdict: string | null;
   ai_needs_clarification: boolean | null;
+  processed_at: string | null;
+  processed_by: string | null;
   received_at: string | null;
   created_at: string;
 }

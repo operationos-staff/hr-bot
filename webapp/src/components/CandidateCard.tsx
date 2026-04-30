@@ -3,7 +3,7 @@ import { Card } from './ui/Card';
 import { Badge } from './ui/Badge';
 import { Avatar } from './ui/Avatar';
 import { ScoreRing } from './ui/ScoreRing';
-import { ChevronRight, MapPin, Briefcase, Clock } from 'lucide-react';
+import { ChevronRight, MapPin, Briefcase, Clock, Check } from 'lucide-react';
 import type { CandidateBase } from '@/lib/types';
 import { formatRelative, sourceLabel, statusEmoji, statusLabel, truncate } from '@/lib/utils';
 import { haptic } from '@/lib/telegram';
@@ -19,16 +19,28 @@ export function CandidateCard({ c, rank }: { c: CandidateBase; rank?: number }) 
     : rank === 2 ? 'aura-bronze'
     : '';
 
+  // F5: визуальная метка обработанных — карточка приглушена, иконка ✓
+  const processed = !!c.processed_at;
+  const processedClass = processed ? 'opacity-60 hover:opacity-90 transition-opacity' : '';
+
   return (
     <Link
       to={`/candidate/${encodeURIComponent(c.source)}/${encodeURIComponent(c.external_id)}`}
       onClick={() => haptic('light')}
-      className="block animate-in"
+      className={`block animate-in ${processedClass}`}
     >
       <Card className={`relative overflow-hidden ${auraClass}`}>
         {typeof rank === 'number' && rank < 3 && (
           <div className="absolute right-3 top-3 text-xl">
             {rank === 0 ? '🥇' : rank === 1 ? '🥈' : '🥉'}
+          </div>
+        )}
+        {processed && (
+          <div
+            className="absolute right-3 top-3 grid h-6 w-6 place-items-center rounded-full bg-emerald-500 text-white shadow-md shadow-emerald-500/40"
+            title={`Обработан${c.processed_by ? ` @${c.processed_by}` : ''}`}
+          >
+            <Check size={14} strokeWidth={3} />
           </div>
         )}
 

@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Card, CardSub, CardTitle } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -10,19 +10,31 @@ import { Button } from '@/components/ui/Button';
 import { ScoreRing } from '@/components/ui/ScoreRing';
 import {
   ArrowLeft, ExternalLink, MapPin, Briefcase, Clock, MessageSquare, AlertTriangle,
-  Sparkles, FileText, CheckCircle2, AlertCircle, XCircle, Link2,
+  Sparkles, FileText, CheckCircle2, AlertCircle, XCircle, Link2, Check, Undo2,
 } from 'lucide-react';
-import { formatDate, formatRelative, sourceLabel, statusLabel, scoreColor } from '@/lib/utils';
+import { formatDate, formatDateOnly, formatRelative, sourceLabel, statusLabel, scoreColor } from '@/lib/utils';
 import { openExternal, haptic } from '@/lib/telegram';
 
 export function CandidateDetailPage() {
   const { source = '', externalId = '' } = useParams();
   const nav = useNavigate();
+  const qc = useQueryClient();
 
   const { data: c, isLoading, isError } = useQuery({
     queryKey: ['candidate', source, externalId],
     queryFn: () => api.candidate(source, externalId),
     enabled: !!source && !!externalId,
+  });
+
+  const processMutation = useMutation({
+    mutationFn: (processed: boolean) => api.setProcessed(source, externalId, processed),
+    onSuccess: (data) => {
+      qc.setQueryData(['candidate', source, externalId], data.application);
+      qc.invalidateQueries({ queryKey: ['ranking'] });
+      qc.invalidateQueries({ queryKey: ['applications'] });
+      haptic('success');
+    },
+    onError: () => haptic('error'),
   });
 
   if (isLoading) {
@@ -79,7 +91,12 @@ export function CandidateDetailPage() {
         <div className="mt-4 grid grid-cols-3 gap-2 border-t border-tg-border pt-3 text-xs text-tg-hint">
           <Info icon={<Briefcase size={12} />} label="Вакансия" value={c.vacancy_title} />
           <Info icon={<MapPin size={12} />} label="Локация" value={c.location} />
-          <Info icon={<Clock size={12} />} label="Получено" value={c.received_at ? formatRelative(c.received_at) : null} />
+          <Info
+            icon={<Clock size={12} />}
+            label="Получено"
+            value={c.received_at ? formatDate(c.received_at) : null}
+            secondary={c.received_at ? formatRelative(c.received_at) : null}
+          />
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -94,6 +111,47 @@ export function CandidateDetailPage() {
             </Button>
           )}
         </div>
+      </Card>
+
+      {/* F4: статус обработки */}
+      <Card className={c.processed_at
+        ? 'mt-3 border-emerald-300 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10'
+        : 'mt-3'}>
+        {c.processed_at ? (
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+                <Check size={14} /> Обработан
+              </p>
+              <p className="mt-1 text-xs text-tg-hint">
+                {formatDate(c.processed_at)}
+                {c.processed_by ? ` · @${c.processed_by}` : ''}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => processMutation.mutate(false)}
+              disabled={processMutation.isPending}
+            >
+              <Undo2 size={14} /> Снять
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-tg-text">Кандидат ещё не обработан</p>
+              <p className="mt-0.5 text-xs text-tg-hint">Отметь когда напишешь / позвонишь / отклонишь</p>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => processMutation.mutate(true)}
+              disabled={processMutation.isPending}
+            >
+              <Check size={14} /> {processMutation.isPending ? '...' : 'Обработан'}
+            </Button>
+          </div>
+        )}
       </Card>
 
       {/* AI разбор */}
@@ -153,13 +211,19 @@ export function CandidateDetailPage() {
   );
 }
 
-function Info({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | null | undefined }) {
+function Info({ icon, label, value, secondary }: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | null | undefined;
+  secondary?: string | null | undefined;
+}) {
   return (
     <div>
       <p className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-tg-hint">
         {icon} {label}
       </p>
       <p className="mt-1 truncate text-xs font-medium text-tg-text">{value || '—'}</p>
+      {secondary && <p className="truncate text-[10px] text-tg-hint">{secondary}</p>}
     </div>
   );
 }

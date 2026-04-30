@@ -1,15 +1,16 @@
 import { Router } from 'express';
-import { supabase } from '../../services/database.js';
+import { supabase, markApplicationProcessed } from '../../services/database.js';
 import { logger } from '../../utils/logger.js';
 
 export const applicationsRoutes = Router();
 
 const SELECT_FIELDS = `
   source, external_id, candidate_name, candidate_url, application_url,
-  position, vacancy_title, location,
+  position, vacancy_title, vacancy_id, location,
   citizenship, citizenship_raw, experience_years,
   qualified, filter_reason, cover_letter,
   ai_score, ai_verdict, ai_summary, ai_needs_clarification, ai_clarification, ai_analyzed_at,
+  processed_at, processed_by,
   raw_data, received_at, created_at
 `;
 
@@ -19,6 +20,7 @@ const LIST_SELECT_FIELDS = `
   citizenship, citizenship_raw, experience_years,
   qualified, filter_reason,
   ai_score, ai_verdict, ai_needs_clarification,
+  processed_at, processed_by,
   received_at, created_at
 `;
 
@@ -104,5 +106,35 @@ applicationsRoutes.get('/:source/:externalId', async (req, res, next) => {
     if (error) throw error;
     if (!data) return res.status(404).json({ error: 'not_found' });
     res.json(data);
+  } catch (err) { next(err); }
+});
+
+/**
+ * POST /api/applications/:source/:externalId/processed
+ * Body: { processed: boolean }
+ *
+ * Помечает отклик как «обработан HR» или снимает метку.
+ * processed_by заполняется из req.tgUser.username (HMAC-валидированный
+ * Telegram-пользователь). Используется в Mini App для визуального
+ * различения уже отработанных кандидатов.
+ */
+applicationsRoutes.post('/:source/:externalId/processed', async (req, res, next) => {
+  try {
+    const { source, externalId } = req.params;
+    const value = !!req.body?.processed;
+    const by = req.tgUser?.username || (req.tgUser?.id ? `tg:${req.tgUser.id}` : 'unknown');
+
+    await markApplicationProcessed(source, externalId, { by, value });
+
+    // Возвращаем обновлённую карточку, чтобы фронт сразу обновил состояние
+    const { data, error } = await supabase
+      .from('applications')
+      .select(SELECT_FIELDS)
+      .eq('source', source)
+      .eq('external_id', String(externalId))
+      .maybeSingle();
+    if (error) throw error;
+
+    res.json({ ok: true, application: data });
   } catch (err) { next(err); }
 });

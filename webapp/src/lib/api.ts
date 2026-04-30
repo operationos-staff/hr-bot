@@ -108,6 +108,13 @@ export const api = {
   candidate: (source: string, externalId: string) =>
     http<CandidateDetail>(`/api/applications/${encodeURIComponent(source)}/${encodeURIComponent(externalId)}`),
 
+  // F3: пометить кандидата как «обработан HR»
+  setProcessed: (source: string, externalId: string, processed: boolean) =>
+    http<{ ok: true; application: CandidateDetail }>(
+      `/api/applications/${encodeURIComponent(source)}/${encodeURIComponent(externalId)}/processed`,
+      { method: 'POST', body: JSON.stringify({ processed }) },
+    ),
+
   stats: (since?: string, vacancyId?: string | null) => {
     const qs = new URLSearchParams();
     if (since) qs.set('since', since);
