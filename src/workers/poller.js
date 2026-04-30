@@ -5,6 +5,7 @@ import { sendApplicationCard, sendAlert, sendAiAnalysis, upsertPinnedRanking } f
 import { appendQualifiedCandidate, refreshRankingSheet } from '../services/sheets.js';
 import { isApplicationExists, saveApplication, saveAiScore, getVacancyBySourceExternal } from '../services/database.js';
 import { fetchCandidateFullText, analyzeCandidate, formatAiAnalysis } from '../services/ai-scorer.js';
+import { formatHHResumeAsText } from '../sources/hh-normalizer.js';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 
@@ -85,9 +86,13 @@ export async function processApplication(raw, deps = defaultDeps) {
 
   // 3. AI-анализ (только для ✅ и 🟡, если настроен DeepSeek).
   //    Per-vacancy промпт (D2) — vacancy идёт 3-м аргументом в analyzeCandidate.
+  //    D8: для HH полный текст резюме формируется из raw_data.resume (API HH),
+  //    для Хабра — из PDF через fetchCandidateFullText.
   if (app.qualified !== false && config.deepseek?.apiKey) {
     try {
-      const resumeText = await deps.fetchCandidateFullText(app.candidate_url, config.habr.cookie);
+      const resumeText = app.source === 'hh'
+        ? formatHHResumeAsText(app.raw_data?.resume)
+        : await deps.fetchCandidateFullText(app.candidate_url, config.habr.cookie);
       const analysis = await deps.analyzeCandidate(app, resumeText, vacancy);
       if (analysis) {
         const formatted = deps.formatAiAnalysis(analysis);

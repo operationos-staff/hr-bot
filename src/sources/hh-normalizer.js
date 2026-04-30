@@ -49,6 +49,102 @@ export function normalizeHHResume(resume) {
 }
 
 /**
+ * Форматирует JSON-резюме HH в связный русский текст для AI-оценщика (D8).
+ * Pure-функция — без зависимостей от axios/config.
+ *
+ * @param {Object|null} resume — ответ API HH /resumes/{id}
+ * @returns {string} многострочный текст резюме (или '' если resume пуст)
+ */
+export function formatHHResumeAsText(resume) {
+  if (!resume || typeof resume !== 'object') return '';
+
+  const lines = [];
+
+  // ФИО
+  const fio = [resume.last_name, resume.first_name, resume.middle_name].filter(Boolean).join(' ').trim();
+  if (fio) lines.push(`ФИО: ${fio}`);
+
+  // Возраст
+  if (typeof resume.age === 'number') lines.push(`Возраст: ${resume.age}`);
+
+  // Пол
+  if (resume.gender?.name) lines.push(`Пол: ${resume.gender.name}`);
+
+  // Локация
+  if (resume.area?.name) lines.push(`Город: ${resume.area.name}`);
+
+  // Гражданство
+  const cit = Array.isArray(resume.citizenship)
+    ? resume.citizenship.map(c => c?.name).filter(Boolean).join(', ')
+    : null;
+  if (cit) lines.push(`Гражданство: ${cit}`);
+
+  // Желаемая позиция
+  if (resume.title) lines.push(`Желаемая позиция: ${resume.title}`);
+
+  // ЗП
+  if (resume.salary?.amount) {
+    const cur = resume.salary.currency || '';
+    lines.push(`Желаемая ЗП: ${resume.salary.amount} ${cur}`.trim());
+  }
+
+  // Общий опыт
+  if (typeof resume.total_experience?.months === 'number') {
+    const years = Math.round(resume.total_experience.months / 12 * 10) / 10;
+    lines.push(`Общий опыт: ${years} лет (${resume.total_experience.months} месяцев)`);
+  }
+
+  // История работы
+  if (Array.isArray(resume.experience) && resume.experience.length > 0) {
+    lines.push('');
+    lines.push('История работы:');
+    for (const exp of resume.experience) {
+      const period = `${exp.start || '?'} — ${exp.end || 'настоящее время'}`;
+      const head = `• ${period}: ${exp.position || '—'} в ${exp.company || '—'}`;
+      lines.push(head);
+      if (exp.description) {
+        // Очищаем HTML-теги из описания (HH часто отдаёт <p>, <strong>)
+        const desc = String(exp.description).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (desc) lines.push(`  ${desc.slice(0, 800)}`);
+      }
+    }
+  }
+
+  // Образование
+  const edu = resume.education?.primary;
+  if (Array.isArray(edu) && edu.length > 0) {
+    lines.push('');
+    lines.push('Образование:');
+    for (const e of edu) {
+      const parts = [e.name, e.organization, e.result, e.year].filter(Boolean);
+      if (parts.length) lines.push(`• ${parts.join(', ')}`);
+    }
+  }
+
+  // Навыки (skill_set — массив строк)
+  if (Array.isArray(resume.skill_set) && resume.skill_set.length > 0) {
+    lines.push('');
+    lines.push(`Навыки: ${resume.skill_set.join(', ')}`);
+  }
+
+  // Ключевые навыки (key_skills — массив объектов с name)
+  if (Array.isArray(resume.key_skills) && resume.key_skills.length > 0) {
+    const keys = resume.key_skills.map(k => k?.name).filter(Boolean);
+    if (keys.length) lines.push(`Ключевые навыки: ${keys.join(', ')}`);
+  }
+
+  // Языки
+  if (Array.isArray(resume.language) && resume.language.length > 0) {
+    const langs = resume.language
+      .map(l => l?.name && l?.level?.name ? `${l.name} (${l.level.name})` : l?.name)
+      .filter(Boolean);
+    if (langs.length) lines.push(`Языки: ${langs.join(', ')}`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
  * Нормализует один negotiation + резюме в объект application для poller.
  * @param {Object} neg — items[i] из /negotiations/employer
  * @param {Object|null} resume — ответ /resumes/{id} (или null если не удалось загрузить)

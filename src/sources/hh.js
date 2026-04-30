@@ -14,6 +14,7 @@ import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { saveHHTokens, getHHTokens } from '../services/database.js';
 import { normalizeHHNegotiation } from './hh-normalizer.js';
+import { paginate } from '../utils/paginate.js';
 
 const HH_API = 'https://api.hh.ru';
 const USER_AGENT = 'Bot_HH_Habr/1.0 (vladistsvetkov@gmail.com)';
@@ -141,14 +142,17 @@ export async function fetchHHNegotiations(vacancyId = null) {
     logger.warn('HH: fetchHHNegotiations called without vacancyId — endpoint /negotiations/response требует vacancy_id');
     return [];
   }
-  const params = {
-    vacancy_id: vacancyId,
-    per_page: 50,
-    page: 0,
-  };
-
-  const data = await hhRequest('/negotiations/response', params);
-  return data.items || [];
+  // D9: пагинируемся по всем страницам (HH отдаёт по 50 на страницу).
+  // maxPages=10 → до 500 откликов за один цикл, дальше дедупликация по БД.
+  const items = await paginate(async (page) => {
+    const data = await hhRequest('/negotiations/response', {
+      vacancy_id: vacancyId,
+      per_page: 50,
+      page,
+    });
+    return data;
+  }, { perPage: 50, maxPages: 10 });
+  return items;
 }
 
 /**
