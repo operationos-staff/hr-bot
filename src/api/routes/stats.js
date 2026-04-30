@@ -11,12 +11,18 @@ export const statsRoutes = Router();
 statsRoutes.get('/summary', async (req, res, next) => {
   try {
     const since = req.query.since || config.ranking.since;
+    const vacancyId = req.query.vacancy_id || null;
 
-    const { data, error } = await supabase
+    let q = supabase
       .from('applications')
       .select('source, qualified, ai_score, ai_needs_clarification, received_at, created_at')
       .gte('received_at', since)
       .limit(5000);
+
+    // Фильтр по выбранной вакансии (Mini App: переключатель вакансий)
+    if (vacancyId) q = q.eq('vacancy_id', String(vacancyId));
+
+    const { data, error } = await q;
 
     if (error) throw error;
 
@@ -71,6 +77,7 @@ statsRoutes.get('/summary', async (req, res, next) => {
 
     res.json({
       since,
+      vacancyId,
       kpi: {
         total,
         qualified,

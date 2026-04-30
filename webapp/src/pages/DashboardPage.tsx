@@ -9,16 +9,18 @@ import {
   Area, AreaChart, BarChart, Bar, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid,
   PieChart, Pie, Cell,
 } from 'recharts';
+import { useVacancy } from '@/lib/useVacancy';
 
 const COLORS = ['#10b981', '#eab308', '#f43f5e'];
 
 export function DashboardPage() {
   const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: api.settings.get });
+  const { selectedVacancyId } = useVacancy();
   const since = settings?.rankingSince;
 
   const { data, isLoading } = useQuery({
-    queryKey: ['stats', since],
-    queryFn: () => api.stats(since),
+    queryKey: ['stats', since, selectedVacancyId],
+    queryFn: () => api.stats(since, selectedVacancyId),
     enabled: !!settings,
   });
 

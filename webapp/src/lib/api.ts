@@ -108,9 +108,10 @@ export const api = {
   candidate: (source: string, externalId: string) =>
     http<CandidateDetail>(`/api/applications/${encodeURIComponent(source)}/${encodeURIComponent(externalId)}`),
 
-  stats: (since?: string) => {
+  stats: (since?: string, vacancyId?: string | null) => {
     const qs = new URLSearchParams();
     if (since) qs.set('since', since);
+    if (vacancyId) qs.set('vacancy_id', vacancyId);
     return http<StatsSummary>(`/api/stats/summary?${qs}`);
   },
 
