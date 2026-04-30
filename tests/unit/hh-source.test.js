@@ -21,8 +21,11 @@ import { isHHEnabled, getNewHHApplications } from '../../src/sources/hh.js';
 // isHHEnabled
 // ============================================================
 describe('isHHEnabled — текущее состояние .env', () => {
-  test('false при пустых HH_EMPLOYER_ID/HH_ACCESS_TOKEN (Phase 1)', () => {
+  test('false при пустых HH_CLIENT_ID/SECRET/EMPLOYER_ID (Phase 1)', () => {
     // В .env сейчас HH_* пустые → false
+    // Проверяем employer_id + client_id + client_secret;
+    // accessToken/refreshToken НЕ участвуют — они берутся из БД (oauth_tokens)
+    // через refreshAccessToken после однократного OAuth-flow.
     assert.equal(isHHEnabled(), false);
   });
 });

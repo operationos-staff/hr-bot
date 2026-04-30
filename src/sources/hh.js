@@ -109,10 +109,13 @@ export async function fetchHHResume(resumeId) {
 
 /**
  * Проверяет, настроены ли HH-credentials.
+ * Accept/refresh токены НЕ проверяются — они хранятся в Supabase (oauth_tokens)
+ * и обновляются через refreshAccessToken после однократного OAuth-flow на /hh/callback.
+ * Достаточно: employer_id + client_id + client_secret в .env.
  * @returns {boolean}
  */
 export function isHHEnabled() {
-  return Boolean(config.hh.employerId && config.hh.accessToken);
+  return Boolean(config.hh.employerId && config.hh.clientId && config.hh.clientSecret);
 }
 
 /**
