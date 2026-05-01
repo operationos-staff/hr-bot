@@ -305,6 +305,25 @@ describe('normalizeHHNegotiation — vacancy_external_id (D3)', () => {
     const app = normalizeHHNegotiation(neg, RESUME_RU);
     assert.equal(app.vacancy_external_id, null);
   });
+
+  // Fix: HH в /negotiations/response не возвращает neg.vacancy внутри
+  // каждой negotiation (т.к. vacancy уже в URL-параметре). Поэтому
+  // принимаем явный 3-й аргумент vacancyExternalId как override.
+  test('явный 3-й аргумент vacancyExternalId перекрывает neg.vacancy.id', () => {
+    const app = normalizeHHNegotiation(NEG_RU, RESUME_RU, '132556253');
+    assert.equal(app.vacancy_external_id, '132556253');
+  });
+
+  test('если neg.vacancy.id отсутствует но передан явный vacancyExternalId — берём явный', () => {
+    const neg = { ...NEG_RU, vacancy: null };
+    const app = normalizeHHNegotiation(neg, RESUME_RU, '132556253');
+    assert.equal(app.vacancy_external_id, '132556253');
+  });
+
+  test('явный аргумент null/undefined — fallback на neg.vacancy.id', () => {
+    const app = normalizeHHNegotiation(NEG_RU, RESUME_RU, null);
+    assert.equal(app.vacancy_external_id, '999000111');
+  });
 });
 
 describe('normalizeHHNegotiation — целостность', () => {

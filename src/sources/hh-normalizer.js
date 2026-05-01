@@ -146,10 +146,16 @@ export function formatHHResumeAsText(resume) {
 
 /**
  * Нормализует один negotiation + резюме в объект application для poller.
- * @param {Object} neg — items[i] из /negotiations/employer
+ *
+ * @param {Object} neg — items[i] из /negotiations/response
  * @param {Object|null} resume — ответ /resumes/{id} (или null если не удалось загрузить)
+ * @param {string|null} [vacancyExternalIdOverride] — явный vacancy_id когда мы
+ *   передаём его в URL-параметре /negotiations/response?vacancy_id=...
+ *   HH в этом endpoint НЕ возвращает поле neg.vacancy в каждой negotiation
+ *   (избыточно), и без override мы получили бы vacancy_external_id=null
+ *   → poller не нашёл бы vacancy в БД → сохранил бы запись с vacancy_id=NULL.
  */
-export function normalizeHHNegotiation(neg, resume) {
+export function normalizeHHNegotiation(neg, resume, vacancyExternalIdOverride = null) {
   const r = normalizeHHResume(resume);
 
   const firstName = neg.resume?.first_name || '';
@@ -164,7 +170,9 @@ export function normalizeHHNegotiation(neg, resume) {
     candidate_url: neg.resume?.alternate_url || null,
     application_url: neg.alternate_url || null,
     vacancy_title: neg.vacancy?.name || null,
-    vacancy_external_id: neg.vacancy?.id != null ? String(neg.vacancy.id) : null,
+    vacancy_external_id: vacancyExternalIdOverride != null
+      ? String(vacancyExternalIdOverride)
+      : (neg.vacancy?.id != null ? String(neg.vacancy.id) : null),
     location: r.location,
     citizenship: r.citizenship,
     experience_raw: r.experience_raw,

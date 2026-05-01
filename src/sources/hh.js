@@ -211,13 +211,16 @@ export async function getNewHHApplications(isNewFn, deps = {}) {
         () => getActiveVacancyExternalIds('hh'),
       );
 
-  // Собираем все negotiations со всех вакансий
-  const allNegotiations = [];
+  // Собираем все negotiations со всех вакансий, СОХРАНЯЯ привязку
+  // {neg, vacancyId} — потом передадим vacancyId явно в normalize,
+  // т.к. HH в /negotiations/response не возвращает поле neg.vacancy
+  // (избыточно, мы и так фильтруем по vacancy_id в URL).
+  const allPairs = [];
   if (!vacancyIds || vacancyIds.length === 0) {
-    // Один общий запрос (employer-wide)
+    // Один общий запрос (employer-wide) — без vacancyId, fallback на neg.vacancy.id
     try {
       const negs = await finalDeps.fetchNegotiations(null);
-      allNegotiations.push(...(negs || []));
+      for (const neg of (negs || [])) allPairs.push({ neg, vacancyId: null });
     } catch (err) {
       logger.error(`HH: fetchNegotiations failed: ${err.message}`);
       return [];
@@ -226,7 +229,7 @@ export async function getNewHHApplications(isNewFn, deps = {}) {
     for (const vid of vacancyIds) {
       try {
         const negs = await finalDeps.fetchNegotiations(vid);
-        allNegotiations.push(...(negs || []));
+        for (const neg of (negs || [])) allPairs.push({ neg, vacancyId: vid });
       } catch (err) {
         logger.error(`HH: fetchNegotiations(${vid}) failed: ${err.message}`);
         // продолжаем с другими вакансиями
@@ -236,7 +239,7 @@ export async function getNewHHApplications(isNewFn, deps = {}) {
 
   // Дедуп + полное резюме + нормализация
   const result = [];
-  for (const neg of allNegotiations) {
+  for (const { neg, vacancyId } of allPairs) {
     const externalId = String(neg.id);
     const isNew = await isNewFn('hh', externalId);
     if (!isNew) continue;
@@ -250,7 +253,7 @@ export async function getNewHHApplications(isNewFn, deps = {}) {
       }
     }
 
-    result.push(normalizeHHNegotiation(neg, resume));
+    result.push(normalizeHHNegotiation(neg, resume, vacancyId));
   }
 
   return result;
