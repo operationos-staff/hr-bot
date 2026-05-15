@@ -8,8 +8,10 @@
 import { config } from './config.js';
 import { logger } from './utils/logger.js';
 import { runPollCycle } from './workers/poller.js';
+import { startTelegramUpdatesWorker } from './workers/telegram-updates.js';
 import { initSheetHeaders } from './services/sheets.js';
 import { sendAlert } from './services/telegram.js';
+import { isClon2Configured } from './services/clon2-supabase.js';
 
 async function main() {
   logger.info('==========================================');
@@ -22,6 +24,15 @@ async function main() {
     await initSheetHeaders();
   } catch (err) {
     logger.warn(`Could not init Sheets headers: ${err.message}`);
+  }
+
+  // Запускаем worker приёма callback_query (для кнопки «В воронку Острова»).
+  // Если CLON2_SUPABASE_* не задан — worker всё равно стартует (на случай
+  // последующей настройки в runtime), но кнопка не появляется в новых карточках.
+  if (isClon2Configured()) {
+    startTelegramUpdatesWorker();
+  } else {
+    logger.info('Skipping telegram-updates worker — CLON2_SUPABASE_* not configured.');
   }
 
   // Первый запуск сразу при старте

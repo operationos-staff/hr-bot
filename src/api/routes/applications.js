@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { supabase, markApplicationProcessed } from '../../services/database.js';
+import { pushApplicationToFunnel } from '../../services/funnel.js';
 import { logger } from '../../utils/logger.js';
 
 export const applicationsRoutes = Router();
@@ -11,6 +12,7 @@ const SELECT_FIELDS = `
   qualified, filter_reason, cover_letter,
   ai_score, ai_verdict, ai_summary, ai_needs_clarification, ai_clarification, ai_analyzed_at,
   processed_at, processed_by,
+  funnel_candidate_id, funnel_pushed_at, funnel_pushed_by,
   raw_data, received_at, created_at
 `;
 
@@ -21,6 +23,7 @@ const LIST_SELECT_FIELDS = `
   qualified, filter_reason,
   ai_score, ai_verdict, ai_needs_clarification,
   processed_at, processed_by,
+  funnel_candidate_id, funnel_pushed_at,
   received_at, created_at
 `;
 
@@ -136,5 +139,46 @@ applicationsRoutes.post('/:source/:externalId/processed', async (req, res, next)
     if (error) throw error;
 
     res.json({ ok: true, application: data });
+  } catch (err) { next(err); }
+});
+
+/**
+ * POST /api/applications/:source/:externalId/push-funnel
+ *
+ * Отправляет отклик в воронку найма clon2.candidates (status='new').
+ * Идемпотентно: повторный клик возвращает existing candidate (already_in_funnel).
+ * После успешного push — applications.funnel_candidate_id заполняется,
+ * UI Mini App может показать «✅ В воронке».
+ */
+applicationsRoutes.post('/:source/:externalId/push-funnel', async (req, res, next) => {
+  try {
+    const { source, externalId } = req.params;
+    const by = req.tgUser?.username || (req.tgUser?.id ? `tg:${req.tgUser.id}` : null);
+
+    const result = await pushApplicationToFunnel(source, externalId, by);
+
+    if (!result.ok) {
+      const status = result.state === 'not_configured' ? 503
+        : result.state === 'application_not_found' ? 404
+        : 500;
+      return res.status(status).json({ ok: false, ...result });
+    }
+
+    // Возвращаем обновлённую карточку (с funnel_candidate_id)
+    const { data, error } = await supabase
+      .from('applications')
+      .select(SELECT_FIELDS)
+      .eq('source', source)
+      .eq('external_id', String(externalId))
+      .maybeSingle();
+    if (error) throw error;
+
+    res.json({
+      ok: true,
+      state: result.state,
+      message: result.message,
+      candidateId: result.candidateId,
+      application: data,
+    });
   } catch (err) { next(err); }
 });

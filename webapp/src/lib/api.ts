@@ -115,6 +115,13 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ processed }) },
     ),
 
+  // Перенести отклик в воронку Острова (clon2.candidates, status='new')
+  pushFunnel: (source: string, externalId: string) =>
+    http<{ ok: boolean; state: 'created' | 'already_in_funnel' | string; message?: string; candidateId?: string; application: CandidateDetail }>(
+      `/api/applications/${encodeURIComponent(source)}/${encodeURIComponent(externalId)}/push-funnel`,
+      { method: 'POST' },
+    ),
+
   stats: (since?: string, vacancyId?: string | null) => {
     const qs = new URLSearchParams();
     if (since) qs.set('since', since);
