@@ -24,6 +24,9 @@ export interface CandidateBase {
   ai_needs_clarification: boolean | null;
   processed_at: string | null;
   processed_by: string | null;
+  funnel_candidate_id: string | null;
+  funnel_pushed_at: string | null;
+  funnel_pushed_by?: string | null;
   received_at: string | null;
   created_at: string;
 }

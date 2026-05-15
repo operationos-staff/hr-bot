@@ -11,6 +11,7 @@ import { ScoreRing } from '@/components/ui/ScoreRing';
 import {
   ArrowLeft, ExternalLink, MapPin, Briefcase, Clock, MessageSquare, AlertTriangle,
   Sparkles, FileText, CheckCircle2, AlertCircle, XCircle, Link2, Check, Undo2,
+  Target, ArrowUpRight,
 } from 'lucide-react';
 import { formatDate, formatDateOnly, formatRelative, sourceLabel, statusLabel, scoreColor } from '@/lib/utils';
 import { openExternal, haptic } from '@/lib/telegram';
@@ -31,6 +32,16 @@ export function CandidateDetailPage() {
     onSuccess: (data) => {
       qc.setQueryData(['candidate', source, externalId], data.application);
       qc.invalidateQueries({ queryKey: ['ranking'] });
+      qc.invalidateQueries({ queryKey: ['applications'] });
+      haptic('success');
+    },
+    onError: () => haptic('error'),
+  });
+
+  const funnelMutation = useMutation({
+    mutationFn: () => api.pushFunnel(source, externalId),
+    onSuccess: (data) => {
+      qc.setQueryData(['candidate', source, externalId], data.application);
       qc.invalidateQueries({ queryKey: ['applications'] });
       haptic('success');
     },
@@ -151,6 +162,57 @@ export function CandidateDetailPage() {
               <Check size={14} /> {processMutation.isPending ? '...' : 'Обработан'}
             </Button>
           </div>
+        )}
+      </Card>
+
+      {/* В воронку Острова — кнопка добавления в clon2.candidates */}
+      <Card className={c.funnel_candidate_id
+        ? 'mt-3 border-indigo-300 bg-indigo-50 dark:border-indigo-500/30 dark:bg-indigo-500/10'
+        : 'mt-3'}>
+        {c.funnel_candidate_id ? (
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-indigo-800 dark:text-indigo-300">
+                <CheckCircle2 size={14} /> В воронке Острова
+              </p>
+              <p className="mt-1 text-xs text-tg-hint">
+                {c.funnel_pushed_at && formatDate(c.funnel_pushed_at)}
+                {c.funnel_pushed_by ? ` · @${c.funnel_pushed_by}` : ''}
+              </p>
+            </div>
+            <a
+              href={`https://hrtisland.vercel.app/?focus=candidate:${c.funnel_candidate_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+              onClick={() => haptic('light')}
+            >
+              <ArrowUpRight size={12} /> Открыть
+            </a>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-tg-text">
+                <Target size={14} /> Добавить в воронку Острова
+              </p>
+              <p className="mt-0.5 text-xs text-tg-hint">
+                Кандидат попадёт в kanban Найма в колонке «Новые»
+              </p>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => funnelMutation.mutate()}
+              disabled={funnelMutation.isPending}
+            >
+              <Target size={14} /> {funnelMutation.isPending ? '...' : 'В воронку'}
+            </Button>
+          </div>
+        )}
+        {funnelMutation.isError && (
+          <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+            ⚠ {(funnelMutation.error as Error).message || 'Не удалось добавить'}
+          </p>
         )}
       </Card>
 

@@ -20,6 +20,7 @@
 
 import { getClon2Client, isClon2Configured } from './clon2-supabase.js';
 import { getApplicationBySourceExternal } from './database.js';
+import { supabase } from './database.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -34,9 +35,10 @@ import { logger } from '../utils/logger.js';
  * Pushes a single application into clon2.candidates.
  * @param {string} source - 'hh' | 'habr'
  * @param {string} externalId
+ * @param {string} [pushedBy] - HR username / id для аудит-поля funnel_pushed_by
  * @returns {Promise<PushResult>}
  */
-export async function pushApplicationToFunnel(source, externalId) {
+export async function pushApplicationToFunnel(source, externalId, pushedBy = null) {
   if (!isClon2Configured()) {
     return { ok: false, state: 'not_configured', message: 'Сервер не настроен на запись в clon2 (нет CLON2_SUPABASE_*).' };
   }
@@ -69,6 +71,8 @@ export async function pushApplicationToFunnel(source, externalId) {
 
     if (existing) {
       logger.info(`Application ${source}/${externalId} уже в воронке clon2 как candidate ${existing.id} (status=${existing.status})`);
+      // Бекфилл funnel_candidate_id если applications ещё не помечены
+      await markApplicationPushed(source, externalId, existing.id, pushedBy).catch(err => logger.warn(`markApplicationPushed backfill: ${err.message}`));
       return { ok: true, state: 'already_in_funnel', candidateId: existing.id, message: `Уже в воронке как «${existing.full_name}»` };
     }
   }
@@ -121,6 +125,27 @@ export async function pushApplicationToFunnel(source, externalId) {
     return { ok: false, state: 'error', message: error.message };
   }
 
+  // Помечаем applications что отклик ушёл в воронку (для UI Mini App)
+  await markApplicationPushed(source, externalId, data.id, pushedBy).catch(err => logger.warn(`markApplicationPushed: ${err.message}`));
+
   logger.info(`Application ${source}/${externalId} → clon2.candidates ${data.id}`);
   return { ok: true, state: 'created', candidateId: data.id, message: `«${data.full_name}» добавлен в воронку Острова` };
+}
+
+/**
+ * Помечает applications что отклик уже в воронке clon2.
+ * Безопасно для повторных вызовов — UPDATE с фильтром is null.
+ */
+async function markApplicationPushed(source, externalId, candidateId, pushedBy) {
+  const { error } = await supabase
+    .from('applications')
+    .update({
+      funnel_candidate_id: candidateId,
+      funnel_pushed_at: new Date().toISOString(),
+      funnel_pushed_by: pushedBy || null,
+    })
+    .eq('source', source)
+    .eq('external_id', String(externalId))
+    .is('funnel_candidate_id', null); // не перезаписываем если уже помечено
+  if (error) throw error;
 }
