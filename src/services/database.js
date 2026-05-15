@@ -193,6 +193,25 @@ export async function getVacancyBySourceExternal(source, externalId) {
 }
 
 /**
+ * Достать application по (source, external_id) — используется при пуше в воронку clon2.
+ * Возвращает полную строку с AI-полями (ai_score, ai_verdict, ai_summary, ai_*_clarification).
+ */
+export async function getApplicationBySourceExternal(source, externalId) {
+  const { data, error } = await supabase
+    .from('applications')
+    .select('*')
+    .eq('source', source)
+    .eq('external_id', String(externalId))
+    .maybeSingle();
+
+  if (error) {
+    logger.error(`DB getApplicationBySourceExternal error: ${error.message}`);
+    throw error;
+  }
+  return data || null;
+}
+
+/**
  * Список external_id активных вакансий по источнику (E1).
  * Используется в habr.js / hh.js, чтобы поллер брал список ID из БД,
  * а не из .env. Тогда добавить вакансию = INSERT в vacancies, без рестарта.

@@ -11,6 +11,16 @@ export const config = {
     url: require_env('SUPABASE_URL'),
     serviceKey: require_env('SUPABASE_SERVICE_KEY'),
   },
+  // Целевой Supabase «Острова Сокровищ» — куда HR одним тапом отправляет
+  // отклик из этого бота в воронку найма (таблица candidates).
+  // Опциональный — если не задан, кнопка «В воронку» не появляется в карточках.
+  clon2: {
+    supabaseUrl: process.env.CLON2_SUPABASE_URL || '',
+    supabaseKey: process.env.CLON2_SUPABASE_SERVICE_KEY || '',
+    // Имя источника, под которым отклики из этого бота попадают в clon2.
+    // Поле source в clon2.candidates имеет CHECK — допустимы 'hh','habr','linkedin','referral','direct','other'.
+    // Маппим напрямую source='hh'/'habr'.
+  },
   telegram: {
     token: require_env('TELEGRAM_BOT_TOKEN'),
     channelId: require_env('TELEGRAM_CHANNEL_ID'),

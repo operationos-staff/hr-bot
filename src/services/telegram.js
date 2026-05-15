@@ -3,6 +3,7 @@ import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { truncate } from '../utils/helpers.js';
 import { getRanking, getUiState, setUiState } from './database.js';
+import { isClon2Configured } from './clon2-supabase.js';
 
 const PIN_STATE_KEY = 'telegram_pinned_ranking_message_id';
 
@@ -134,8 +135,19 @@ export async function sendApplicationCard(app, vacancy = null) {
   if (miniAppUrl) {
     buttons.push({ text: '📱 В Mini App', url: miniAppUrl });
   }
-  if (buttons.length) {
-    payload.reply_markup = { inline_keyboard: [buttons] };
+
+  // Кнопка «В воронку Острова» — callback_query, обрабатывается в workers/telegram-updates.js.
+  // callback_data ограничен 64 байтами, поэтому шлём только source+external_id.
+  const funnelButton = isClon2Configured()
+    ? { text: '➕ В воронку Острова', callback_data: `funnel:${app.source}:${String(app.external_id).slice(0, 50)}` }
+    : null;
+
+  // Раскладываем кнопки: первая строка — внешние ссылки, вторая — funnel (если есть)
+  const rows = [];
+  if (buttons.length) rows.push(buttons);
+  if (funnelButton) rows.push([funnelButton]);
+  if (rows.length) {
+    payload.reply_markup = { inline_keyboard: rows };
   }
 
   try {
