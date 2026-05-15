@@ -96,7 +96,10 @@ export async function pushApplicationToFunnel(source, externalId) {
 
   const payload = {
     full_name: app.candidate_name || '(без имени)',
+    // position = должность кандидата из его резюме (или fallback на vacancy_title)
     position: app.position || app.vacancy_title || '(не указана)',
+    // vacancy_title = открытая вакансия (PHP, AMO CRM, ...) — для фильтра воронок
+    vacancy_title: app.vacancy_title || null,
     source, // 'hh' | 'habr' — оба значения валидны в clon2.candidates CHECK
     source_url: sourceUrl,
     cover_letter: app.cover_letter || null,
